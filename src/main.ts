@@ -59,6 +59,11 @@ app.innerHTML = `
         <div class="brand-title">F3 Geographic Directory</div>
         <div class="brand-subtitle">Sectors → Areas → Regions → AOs</div>
       </div>
+      <div class="layers" id="layers">
+        <button class="layer-btn layer-active" data-level="0">Sectors</button>
+        <button class="layer-btn" data-level="1">Areas</button>
+        <button class="layer-btn" data-level="2">Regions</button>
+      </div>
       <div class="controls">
         <button id="back-btn" class="btn" type="button" disabled>Back</button>
         <div id="breadcrumb" class="breadcrumb"></div>
@@ -80,14 +85,33 @@ const map = L.map('map', {
   minZoom: 2
 }).setView([37.6, -96], 4)
 
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  attribution: '&copy; OpenStreetMap contributors'
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+  attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+  subdomains: 'abcd',
+  maxZoom: 20
 }).addTo(map)
 
 const layerGroup = L.layerGroup().addTo(map)
 const infoPanel = document.querySelector<HTMLDivElement>('#info')!
 const breadcrumbEl = document.querySelector<HTMLDivElement>('#breadcrumb')!
 const backBtn = document.querySelector<HTMLButtonElement>('#back-btn')!
+const layersContainer = document.querySelector<HTMLDivElement>('#layers')!
+
+// Handle layer button clicks
+layersContainer.querySelectorAll('.layer-btn').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    const level = parseInt((btn as HTMLElement).dataset.level!)
+    selectedPath = []
+    currentLevelIndex = level
+    
+    // Update active button styling
+    layersContainer.querySelectorAll('.layer-btn').forEach((b) => b.classList.remove('layer-active'))
+    btn.classList.add('layer-active')
+    
+    updateUrlState()
+    renderLevel()
+  })
+})
 
 const levelOrder: OrgType[] = ['sector', 'area', 'region', 'ao']
 let currentLevelIndex = 0
@@ -190,6 +214,57 @@ async function fetchPaged<T>(path: string, params: Record<string, string | numbe
 
 function isSectorInternational(org: Org): boolean {
   return org.orgType === 'sector' && org.name.trim().toLowerCase() === 'international'
+}
+
+function isGeneralInternationalArea(org: Org): boolean {
+  return org.orgType === 'area' && org.name.trim().toLowerCase() === 'general international area'
+}
+
+function updateUrlState() {
+  const params = new URLSearchParams()
+  
+  if (selectedPath.length > 0) {
+    const lastOrg = selectedPath[selectedPath.length - 1]
+    params.set('org', String(lastOrg.id))
+  } else {
+    params.set('level', String(currentLevelIndex))
+  }
+  
+  window.history.replaceState(null, '', `?${params.toString()}`)
+}
+
+function restoreStateFromUrl() {
+  const params = new URLSearchParams(window.location.search)
+  const orgParam = params.get('org')
+  const levelParam = params.get('level')
+  
+  if (orgParam) {
+    const orgId = parseInt(orgParam, 10)
+    const org = orgById.get(orgId)
+    
+    if (org) {
+      // Build the full path by walking up the parent chain
+      const path: Org[] = []
+      let current: Org | undefined = org
+      
+      while (current) {
+        path.unshift(current)
+        current = current.parentId ? orgById.get(current.parentId) : undefined
+      }
+      
+      // Filter out Nation org since it's already shown in the breadcrumb
+      selectedPath = path.filter((o) => o.orgType !== 'nation')
+      
+      // Derive the level - show children of the selected org, not the org itself
+      const levelIndex = levelOrder.indexOf(org.orgType)
+      if (levelIndex !== -1) {
+        currentLevelIndex = levelIndex + 1
+      }
+    }
+  } else if (levelParam) {
+    currentLevelIndex = parseInt(levelParam, 10)
+    selectedPath = []
+  }
 }
 
 function getPositions(): Position[] {
@@ -401,13 +476,17 @@ function renderBreadcrumb() {
       crumb.addEventListener('click', () => {
         const depth = parseInt((crumb as HTMLElement).dataset.depth!)
         if (depth === -1) {
+          // Clicking Nation: show sectors on map but Nation info in sidebar
           selectedPath = []
           currentLevelIndex = 0
+          updateUrlState()
           renderLevel()
+          // Display Nation info after rendering sectors
           displayNationInfo()
         } else {
           selectedPath = selectedPath.slice(0, depth + 1)
           currentLevelIndex = depth + 1
+          updateUrlState()
           renderLevel()
         }
       })
@@ -424,7 +503,11 @@ function getCurrentLevelOrgs(): Org[] {
   }
 
   const parent = selectedPath[selectedPath.length - 1]
-  if (!parent) return []
+  
+  // If no parent selected, show all orgs of this level (for layer button views)
+  if (!parent) {
+    return [...orgById.values()].filter((org) => org.orgType === level)
+  }
 
   // Special handling for International: get all region descendants (not just direct children)
   if (isSectorInternational(parent) && level === 'region') {
@@ -438,6 +521,11 @@ function getCurrentLevelOrgs(): Org[] {
 function renderLevel(focusBounds?: L.LatLngBounds) {
   layerGroup.clearLayers()
   renderBreadcrumb()
+  
+  // Update active layer button
+  layersContainer.querySelectorAll('.layer-btn').forEach((btn) => btn.classList.remove('layer-active'))
+  const activeBtn = layersContainer.querySelector(`[data-level="${currentLevelIndex}"]`)
+  if (activeBtn) activeBtn.classList.add('layer-active')
 
   const level = levelOrder[currentLevelIndex]
   const orgs = getCurrentLevelOrgs()
@@ -447,8 +535,8 @@ function renderLevel(focusBounds?: L.LatLngBounds) {
     let latLngs: L.LatLng[]
     let pointsCount = 0
     
-    // Special handling for International sector - create star polygon in Atlantic
-    if (isSectorInternational(org)) {
+    // Special handling for International sector and General International Area - create star polygon in Atlantic
+    if (isSectorInternational(org) || isGeneralInternationalArea(org)) {
       const atlanticCenter = { lat: 20, lng: -40 }
       const starPoints = createStarPolygon(atlanticCenter, 8, 5)
       latLngs = starPoints.map((point) => L.latLng(point.lat, point.lng))
@@ -497,14 +585,32 @@ function renderLevel(focusBounds?: L.LatLngBounds) {
     })
 
     polygon.on('click', () => {
+      // Regions are view-only, don't navigate on click
+      if (org.orgType === 'region') return
       if (currentLevelIndex >= levelOrder.length - 1) return
-      selectedPath = [...selectedPath, org]
-      // Skip Area level for International sector
-      if (isSectorInternational(org)) {
+      
+      // If viewing all orgs of a level (no parent selected) and clicking an org with a parent,
+      // include the parent in the path for proper breadcrumb navigation
+      // Skip Nation org since it's already shown in the breadcrumb
+      if (selectedPath.length === 0 && org.parentId) {
+        const parent = orgById.get(org.parentId)
+        if (parent && parent.orgType !== 'nation') {
+          selectedPath = [parent, org]
+        } else {
+          selectedPath = [org]
+        }
+      } else {
+        selectedPath = [...selectedPath, org]
+      }
+      
+      // Skip Area level for International sector and General International Area
+      if (isSectorInternational(org) || isGeneralInternationalArea(org)) {
         currentLevelIndex = 2 // Jump to 'region' level (0=sector, 1=area, 2=region)
+        updateUrlState()
         renderLevel() // No focus bounds - zoom to all regions instead of the star
       } else {
         currentLevelIndex += 1
+        updateUrlState()
         renderLevel(polygon.getBounds())
       }
     })
@@ -531,6 +637,7 @@ backBtn.addEventListener('click', () => {
   const focusPoints = focusOrg ? getOrgPoints(focusOrg) : []
   const focusHull = focusPoints.length >= 3 ? convexHull(focusPoints) : []
   const focusBounds = focusHull.length >= 3 ? L.latLngBounds(focusHull.map((p) => L.latLng(p.lat, p.lng))) : undefined
+  updateUrlState()
   renderLevel(focusBounds)
 })
 
@@ -590,6 +697,7 @@ async function init() {
     console.log(`Sector "${sector.name}" (${sector.id}): ${points.length} points`)
   })
 
+  restoreStateFromUrl()
   renderLevel()
   displayNationInfo()
 }

@@ -50,6 +50,38 @@ body {
   color: #cbd5f5;
 }
 
+.layers {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.layer-btn {
+  padding: 0.5rem 1rem;
+  background: #1e293b;
+  color: #cbd5f5;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.2s ease;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.layer-btn:hover {
+  background: #334155;
+  color: #f8fafc;
+  border-color: #475569;
+}
+
+.layer-btn.layer-active {
+  background: #3b82f6;
+  color: #ffffff;
+  border-color: #3b82f6;
+}
+
 .controls {
   display: flex;
   align-items: center;
