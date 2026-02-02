@@ -8,17 +8,6 @@ Static TypeScript map app that visualizes F3 sectors, areas, regions, and AOs us
 - Click a polygon to drill down to the next level (sector → area → region → AO).
 - Boundaries are built from the convex hull of active locations.
 
-## Configuration
-The app uses the F3 Nation API. A bearer token is required.
-
-- Default API key: `tackle`
-- Override with environment variable: `VITE_F3_API_KEY`
-
-Example `.env`:
-```
-VITE_F3_API_KEY=your-key-here
-```
-
 ## Local Development
 1. Install dependencies: `npm install`
 2. Start dev server: `npm run dev`

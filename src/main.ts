@@ -3,7 +3,7 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
 const API_BASE = 'https://api.f3nation.com'
-const API_KEY = import.meta.env.VITE_F3_API_KEY ?? 'tackle'
+const API_KEY = 'f3-org-map'
 const CLIENT_HEADER = 'scalar-api'
 
 type OrgType = 'sector' | 'area' | 'region' | 'ao'
