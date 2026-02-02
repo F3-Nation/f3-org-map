@@ -6,7 +6,7 @@ const API_BASE = 'https://api.f3nation.com'
 const API_KEY = 'f3-org-map'
 const CLIENT_HEADER = 'scalar-api'
 
-type OrgType = 'sector' | 'area' | 'region' | 'ao'
+type OrgType = 'nation' | 'sector' | 'area' | 'region' | 'ao'
 
 type Org = {
   id: number
