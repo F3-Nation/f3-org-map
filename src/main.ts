@@ -470,7 +470,7 @@ async function init() {
 
   const [orgs, locations, events] = await Promise.all([
     fetchPaged<Org>('/v1/org', {
-      orgTypes: ['sector', 'area', 'region', 'ao'],
+      orgTypes: ['nation', 'sector', 'area', 'region', 'ao'],
       statuses: ['active']
     }),
     fetchPaged<Location>('/v1/location', {
