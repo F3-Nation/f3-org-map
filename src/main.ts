@@ -217,7 +217,7 @@ function renderInfo(org: Org, pointsCount: number) {
   }
   
   const socialMarkup = socialLinks.length > 0 
-    ? `<div class="info-section"><div class="info-label">Connect</div><div class="info-social">${socialLinks.join(' | ')}</div></div>` 
+    ? `<div class="info-section"><div class="info-label">Connect</div><div class="info-social">${socialLinks.join('')}</div></div>` 
     : ''
 
   const positionMarkup = positions.length
@@ -315,6 +315,22 @@ function cross(o: Point, a: Point, b: Point): number {
   return (a.lng - o.lng) * (b.lat - o.lat) - (a.lat - o.lat) * (b.lng - o.lng)
 }
 
+function createStarPolygon(center: { lat: number; lng: number }, radiusDegrees: number, points: number = 5): Point[] {
+  const star: Point[] = []
+  const outerRadius = radiusDegrees
+  const innerRadius = radiusDegrees * 0.4
+  
+  for (let i = 0; i < points * 2; i++) {
+    const angle = (i * Math.PI) / points - Math.PI / 2
+    const radius = i % 2 === 0 ? outerRadius : innerRadius
+    const lat = center.lat + radius * Math.cos(angle)
+    const lng = center.lng + radius * Math.sin(angle)
+    star.push({ lat, lng })
+  }
+  
+  return star
+}
+
 function convexHull(points: Point[]): Point[] {
   if (points.length <= 1) return points
 
@@ -392,11 +408,16 @@ function getCurrentLevelOrgs(): Org[] {
   if (level === 'sector') {
     return [...orgById.values()]
       .filter((org) => org.orgType === 'sector')
-      .filter((org) => !isSectorInternational(org))
   }
 
   const parent = selectedPath[selectedPath.length - 1]
   if (!parent) return []
+
+  // Special handling for International: get all region descendants (not just direct children)
+  if (isSectorInternational(parent) && level === 'region') {
+    const internationalDescendants = getDescendantOrgIds(parent.id)
+    return [...orgById.values()].filter((org) => org.orgType === 'region' && internationalDescendants.includes(org.id))
+  }
 
   return [...orgById.values()].filter((org) => org.orgType === level && org.parentId === parent.id)
 }
@@ -410,12 +431,27 @@ function renderLevel(focusBounds?: L.LatLngBounds) {
   const allLatLngs: L.LatLng[] = []
 
   orgs.forEach((org) => {
-    const points = getOrgPoints(org)
-    if (points.length < 3) return
-    const hull = convexHull(points)
-    if (hull.length < 3) return
-    const latLngs = hull.map((point) => L.latLng(point.lat, point.lng))
-    allLatLngs.push(...latLngs)
+    let latLngs: L.LatLng[]
+    let pointsCount = 0
+    
+    // Special handling for International sector - create star polygon in Atlantic
+    if (isSectorInternational(org)) {
+      const atlanticCenter = { lat: 20, lng: -40 }
+      const starPoints = createStarPolygon(atlanticCenter, 8, 5)
+      latLngs = starPoints.map((point) => L.latLng(point.lat, point.lng))
+      allLatLngs.push(...latLngs)
+      // Still get the real point count from actual event locations
+      const realPoints = getOrgPoints(org)
+      pointsCount = realPoints.length
+    } else {
+      const points = getOrgPoints(org)
+      if (points.length < 3) return
+      const hull = convexHull(points)
+      if (hull.length < 3) return
+      latLngs = hull.map((point) => L.latLng(point.lat, point.lng))
+      allLatLngs.push(...latLngs)
+      pointsCount = points.length
+    }
 
     const polygon = L.polygon(latLngs, {
       color: getOrgColor(org.id),
@@ -426,7 +462,7 @@ function renderLevel(focusBounds?: L.LatLngBounds) {
 
     polygon.on('mouseover', () => {
       polygon.setStyle({ weight: 3, fillOpacity: 0.28 })
-      renderInfo(org, points.length)
+      renderInfo(org, pointsCount)
     })
 
     polygon.on('mouseout', () => {
@@ -436,7 +472,12 @@ function renderLevel(focusBounds?: L.LatLngBounds) {
     polygon.on('click', () => {
       if (currentLevelIndex >= levelOrder.length - 1) return
       selectedPath = [...selectedPath, org]
-      currentLevelIndex += 1
+      // Skip Area level for International sector
+      if (isSectorInternational(org)) {
+        currentLevelIndex = 2 // Jump to 'region' level (0=sector, 1=area, 2=region)
+      } else {
+        currentLevelIndex += 1
+      }
       renderLevel(polygon.getBounds())
     })
 
