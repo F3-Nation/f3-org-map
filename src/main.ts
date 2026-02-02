@@ -331,6 +331,19 @@ function createStarPolygon(center: { lat: number; lng: number }, radiusDegrees: 
   return star
 }
 
+function createCircleBuffer(center: { lat: number; lng: number }, radiusDegrees: number, segments: number = 8): Point[] {
+  const circle: Point[] = []
+  
+  for (let i = 0; i < segments; i++) {
+    const angle = (i / segments) * 2 * Math.PI
+    const lat = center.lat + radiusDegrees * Math.cos(angle)
+    const lng = center.lng + radiusDegrees * Math.sin(angle)
+    circle.push({ lat, lng })
+  }
+  
+  return circle
+}
+
 function convexHull(points: Point[]): Point[] {
   if (points.length <= 1) return points
 
@@ -445,12 +458,26 @@ function renderLevel(focusBounds?: L.LatLngBounds) {
       pointsCount = realPoints.length
     } else {
       const points = getOrgPoints(org)
-      if (points.length < 3) return
-      const hull = convexHull(points)
-      if (hull.length < 3) return
-      latLngs = hull.map((point) => L.latLng(point.lat, point.lng))
-      allLatLngs.push(...latLngs)
       pointsCount = points.length
+      
+      // For regions/areas with fewer than 3 points, create a circle buffer
+      if (points.length < 3) {
+        if (points.length === 0) return
+        const center = { lat: points[0].lat, lng: points[0].lng }
+        if (points.length === 2) {
+          // Average the two points
+          center.lat = (points[0].lat + points[1].lat) / 2
+          center.lng = (points[0].lng + points[1].lng) / 2
+        }
+        const circlePoints = createCircleBuffer(center, 0.15) // ~16km radius at equator
+        latLngs = circlePoints.map((point) => L.latLng(point.lat, point.lng))
+        allLatLngs.push(...latLngs)
+      } else {
+        const hull = convexHull(points)
+        if (hull.length < 3) return
+        latLngs = hull.map((point) => L.latLng(point.lat, point.lng))
+        allLatLngs.push(...latLngs)
+      }
     }
 
     const polygon = L.polygon(latLngs, {
@@ -475,10 +502,11 @@ function renderLevel(focusBounds?: L.LatLngBounds) {
       // Skip Area level for International sector
       if (isSectorInternational(org)) {
         currentLevelIndex = 2 // Jump to 'region' level (0=sector, 1=area, 2=region)
+        renderLevel() // No focus bounds - zoom to all regions instead of the star
       } else {
         currentLevelIndex += 1
+        renderLevel(polygon.getBounds())
       }
-      renderLevel(polygon.getBounds())
     })
 
     polygon.addTo(layerGroup)
