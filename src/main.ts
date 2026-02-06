@@ -275,7 +275,7 @@ function formatNumber(value: number): string {
   return new Intl.NumberFormat('en-US').format(value)
 }
 
-function renderInfo(org: Org, pointsCount: number) {
+function renderInfo(org: Org) {
   const positions = getPositions()
   const descendantIds = getDescendantOrgIds(org.id)
   const descendantOrgs = descendantIds
@@ -373,8 +373,7 @@ function renderPlaceholder(message: string) {
 function displayNationInfo() {
   const nationOrg = orgById.get(1)
   if (nationOrg) {
-    const nationPoints = getOrgPoints(nationOrg)
-    renderInfo(nationOrg, nationPoints.length)
+    renderInfo(nationOrg)
   }
 }
 
@@ -571,7 +570,6 @@ function renderLevel(focusBounds?: L.LatLngBounds) {
 
   orgs.forEach((org) => {
     let latLngs: L.LatLng[]
-    let pointsCount = 0
     
     // Special handling for International sector and General International Area - create star polygon in Atlantic
     if (isSectorInternational(org) || isGeneralInternationalArea(org)) {
@@ -579,12 +577,8 @@ function renderLevel(focusBounds?: L.LatLngBounds) {
       const starPoints = createStarPolygon(atlanticCenter, 8, 5)
       latLngs = starPoints.map((point) => L.latLng(point.lat, point.lng))
       allLatLngs.push(...latLngs)
-      // Still get the real point count from actual event locations
-      const realPoints = getOrgPoints(org)
-      pointsCount = realPoints.length
     } else {
       const points = getOrgPoints(org)
-      pointsCount = points.length
       
       // For regions/areas with fewer than 3 points, create a circle buffer
       if (points.length < 3) {
@@ -615,7 +609,7 @@ function renderLevel(focusBounds?: L.LatLngBounds) {
 
     polygon.on('mouseover', () => {
       polygon.setStyle({ weight: 3, fillOpacity: 0.28 })
-      renderInfo(org, pointsCount)
+      renderInfo(org)
     })
 
     polygon.on('mouseout', () => {
