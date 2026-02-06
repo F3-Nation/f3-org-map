@@ -1,6 +1,8 @@
 import './style.css'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+import turfArea from '@turf/area'
+import { polygon as turfPolygon } from '@turf/helpers'
 
 const API_BASE = 'https://api.f3nation.com'
 const API_KEY = 'f3-org-map'
@@ -275,6 +277,13 @@ function formatNumber(value: number): string {
   return new Intl.NumberFormat('en-US').format(value)
 }
 
+function formatDecimal(value: number, fractionDigits = 1): string {
+  return new Intl.NumberFormat('en-US', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: fractionDigits
+  }).format(value)
+}
+
 function renderInfo(org: Org) {
   const positions = getPositions()
   const descendantIds = getDescendantOrgIds(org.id)
@@ -304,6 +313,19 @@ function renderInfo(org: Org) {
   const formattedAoCount = formatNumber(aoCount)
   const formattedEventsCount = formatNumber(eventsCount)
   const formattedLocationsCount = formatNumber(locationsCount)
+  let regionFootprint: number | null = null
+  if (org.orgType === 'region') {
+    const regionPoints = getOrgPoints(org)
+    if (regionPoints.length >= 3) {
+      const hull = convexHull(regionPoints)
+      if (hull.length >= 3) {
+        const coordinates = hull.map((point) => [point.lng, point.lat])
+        coordinates.push([hull[0].lng, hull[0].lat])
+        const areaSqMeters = turfArea(turfPolygon([coordinates]))
+        regionFootprint = areaSqMeters / 2_589_988.110336
+      }
+    }
+  }
   const emailDisplay = org.email 
     ? `<a href="mailto:${org.email}" class="info-link">${org.email}</a>`
     : 'Not listed'
@@ -354,6 +376,7 @@ function renderInfo(org: Org) {
         <div>AOs: ${formattedAoCount}</div>
         <div>Events: ${formattedEventsCount}</div>
         <div>Locations: ${formattedLocationsCount}</div>
+        ${regionFootprint != null ? `<div>Footprint: ${formatDecimal(regionFootprint)} sq mi</div>` : ''}
       </div>
     </div>
     <div class="info-section">
