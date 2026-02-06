@@ -271,8 +271,39 @@ function getPositions(): Position[] {
   return []
 }
 
+function formatNumber(value: number): string {
+  return new Intl.NumberFormat('en-US').format(value)
+}
+
 function renderInfo(org: Org, pointsCount: number) {
   const positions = getPositions()
+  const descendantIds = getDescendantOrgIds(org.id)
+  const descendantOrgs = descendantIds
+    .map((id) => orgById.get(id))
+    .filter((item): item is Org => item !== undefined)
+  const eventIds = new Set<number>()
+  const locationIds = new Set<number>()
+  descendantIds.forEach((id) => {
+    const events = eventsByOrgId.get(id) ?? []
+    events.forEach((event) => {
+      eventIds.add(event.id)
+      if (event.locationId != null) {
+        locationIds.add(event.locationId)
+      }
+    })
+  })
+  const sectorCount = descendantOrgs.filter((item) => item.orgType === 'sector').length
+  const areaCount = descendantOrgs.filter((item) => item.orgType === 'area').length
+  const regionCount = descendantOrgs.filter((item) => item.orgType === 'region').length
+  const aoCount = descendantOrgs.filter((item) => item.orgType === 'ao').length
+  const eventsCount = eventIds.size
+  const locationsCount = locationIds.size
+  const formattedAreaCount = formatNumber(areaCount)
+  const formattedRegionCount = formatNumber(regionCount)
+  const formattedSectorCount = formatNumber(sectorCount)
+  const formattedAoCount = formatNumber(aoCount)
+  const formattedEventsCount = formatNumber(eventsCount)
+  const formattedLocationsCount = formatNumber(locationsCount)
   const emailDisplay = org.email 
     ? `<a href="mailto:${org.email}" class="info-link">${org.email}</a>`
     : 'Not listed'
@@ -315,8 +346,15 @@ function renderInfo(org: Org, pointsCount: number) {
     </div>
     ${socialMarkup}
     <div class="info-section">
-      <div class="info-label">Active Locations</div>
-      <div class="info-value">${pointsCount}</div>
+      <div class="info-label">Counts</div>
+      <div class="info-value">
+        ${org.orgType === 'nation' ? `<div>Sectors: ${formattedSectorCount}</div>` : ''}
+        ${org.orgType === 'nation' || org.orgType === 'sector' ? `<div>Areas: ${formattedAreaCount}</div>` : ''}
+        ${org.orgType === 'nation' || org.orgType === 'sector' || org.orgType === 'area' ? `<div>Regions: ${formattedRegionCount}</div>` : ''}
+        <div>AOs: ${formattedAoCount}</div>
+        <div>Events: ${formattedEventsCount}</div>
+        <div>Locations: ${formattedLocationsCount}</div>
+      </div>
     </div>
     <div class="info-section">
       <div class="info-label">Positions</div>
