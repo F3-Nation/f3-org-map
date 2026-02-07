@@ -331,17 +331,22 @@ function renderInfo(org: Org) {
     : 'Not listed'
   
   const socialLinks: string[] = []
+  const globeIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="info-icon" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"></path><path d="M2 12h20"></path></svg>'
+  const twitterIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="info-icon" aria-hidden="true"><path d="M22 4s-.7 2.1-2 3.4c1.6 10-9.4 17.3-18 11.6 2.2.1 4.4-.6 6-2C3 15.5.5 9.6 3 5c2.2 2.6 5.6 4.1 9 4-.9-4.2 4-6.6 7-3.8 1.1 0 3-1.2 3-1.2z"></path></svg>'
+  const facebookIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="info-icon" aria-hidden="true"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path></svg>'
+  const instagramIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="info-icon" aria-hidden="true"><rect width="20" height="20" x="2" y="2" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" x2="17.51" y1="6.5" y2="6.5"></line></svg>'
+
   if (org.website) {
-    socialLinks.push(`<a href="${org.website}" target="_blank" rel="noopener noreferrer" class="info-link">🌐 Website</a>`)
+    socialLinks.push(`<a href="${org.website}" target="_blank" rel="noopener noreferrer" class="info-icon-link" title="Website" aria-label="Website">${globeIcon}</a>`)
   }
   if (org.twitter) {
-    socialLinks.push(`<a href="https://twitter.com/${org.twitter}" target="_blank" rel="noopener noreferrer" class="info-link">𝕏 Twitter</a>`)
+    socialLinks.push(`<a href="${org.twitter}" target="_blank" rel="noopener noreferrer" class="info-icon-link" title="X (Twitter)" aria-label="X (Twitter)">${twitterIcon}</a>`)
   }
   if (org.facebook) {
-    socialLinks.push(`<a href="https://facebook.com/${org.facebook}" target="_blank" rel="noopener noreferrer" class="info-link">f Facebook</a>`)
+    socialLinks.push(`<a href="${org.facebook}" target="_blank" rel="noopener noreferrer" class="info-icon-link" title="Facebook" aria-label="Facebook">${facebookIcon}</a>`)
   }
   if (org.instagram) {
-    socialLinks.push(`<a href="https://instagram.com/${org.instagram}" target="_blank" rel="noopener noreferrer" class="info-link">📷 Instagram</a>`)
+    socialLinks.push(`<a href="${org.instagram}" target="_blank" rel="noopener noreferrer" class="info-icon-link" title="Instagram" aria-label="Instagram">${instagramIcon}</a>`)
   }
   
   const socialMarkup = socialLinks.length > 0 
@@ -373,8 +378,8 @@ function renderInfo(org: Org) {
         ${org.orgType === 'nation' ? `<div>Sectors: ${formattedSectorCount}</div>` : ''}
         ${org.orgType === 'nation' || org.orgType === 'sector' ? `<div>Areas: ${formattedAreaCount}</div>` : ''}
         ${org.orgType === 'nation' || org.orgType === 'sector' || org.orgType === 'area' ? `<div>Regions: ${formattedRegionCount}</div>` : ''}
-        <div>AOs: ${formattedAoCount}</div>
         <div>Events: ${formattedEventsCount}</div>
+        <div>AOs: ${formattedAoCount}</div>
         <div>Locations: ${formattedLocationsCount}</div>
         ${regionFootprint != null ? `<div>Footprint: ${formatDecimal(regionFootprint)} sq mi</div>` : ''}
       </div>

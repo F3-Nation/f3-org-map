@@ -204,15 +204,32 @@ body {
 }
 
 .info-social {
-  font-size: 0.9rem;
-  color: #0f172a;
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
   gap: 0.5rem;
 }
 
-.info-social a {
-  display: block;
+.info-icon-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: #1e293b;
+  transition: background 0.2s ease, color 0.2s ease;
+  text-decoration: none;
+}
+
+.info-icon-link:hover {
+  background: rgba(15, 23, 42, 0.12);
+  color: #0f172a;
+}
+
+.info-icon {
+  width: 16px;
+  height: 16px;
 }
 
 .info-list {
