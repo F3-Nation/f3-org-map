@@ -671,7 +671,8 @@ function renderLevel(focusBounds?: L.LatLngBounds) {
       } else {
         currentLevelIndex += 1
         updateUrlState()
-        renderLevel(polygon.getBounds())
+        const focusBounds = org.orgType === 'area' ? undefined : polygon.getBounds()
+        renderLevel(focusBounds)
       }
     })
 
