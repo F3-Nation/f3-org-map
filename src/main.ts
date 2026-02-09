@@ -72,7 +72,12 @@ app.innerHTML = `
       </div>
     </header>
     <main class="main">
-      <section id="map" class="map"></section>
+      <section id="map" class="map">
+        <div class="map-loading" id="map-loading" aria-live="polite" aria-hidden="false">
+          <div class="map-loading-spinner" aria-hidden="true"></div>
+          <div class="map-loading-text">Loading map data...</div>
+        </div>
+      </section>
       <aside class="info" id="info">
         <div class="info-title">Loading organizations...</div>
         <div class="info-body"></div>
@@ -98,6 +103,17 @@ const infoPanel = document.querySelector<HTMLDivElement>('#info')!
 const breadcrumbEl = document.querySelector<HTMLDivElement>('#breadcrumb')!
 const backBtn = document.querySelector<HTMLButtonElement>('#back-btn')!
 const layersContainer = document.querySelector<HTMLDivElement>('#layers')!
+const mapLoadingEl = document.querySelector<HTMLDivElement>('#map-loading')!
+
+function setMapLoading(isLoading: boolean, message: string = 'Loading map data...') {
+  if (!mapLoadingEl) return
+  const textEl = mapLoadingEl.querySelector<HTMLDivElement>('.map-loading-text')
+  if (textEl) {
+    textEl.textContent = message
+  }
+  mapLoadingEl.classList.toggle('is-hidden', !isLoading)
+  mapLoadingEl.setAttribute('aria-hidden', String(!isLoading))
+}
 
 // Handle layer button clicks
 layersContainer.querySelectorAll('.layer-btn').forEach((btn) => {
@@ -703,6 +719,7 @@ backBtn.addEventListener('click', () => {
 })
 
 async function init() {
+  setMapLoading(true, 'Loading organizations...')
   renderPlaceholder('Loading organizations...')
 
   const [orgs, locations, events] = await Promise.all([
@@ -761,9 +778,11 @@ async function init() {
   restoreStateFromUrl()
   renderLevel()
   displayNationInfo()
+  setMapLoading(false)
 }
 
 init().catch((error) => {
   renderPlaceholder('Failed to load data.')
+  setMapLoading(false)
   console.error(error)
 })
