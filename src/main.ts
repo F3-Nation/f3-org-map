@@ -3,16 +3,31 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import turfArea from '@turf/area'
 import { polygon as turfPolygon } from '@turf/helpers'
+import {
+  buildOrgHierarchy,
+  getOrgPointsFromItem,
+  normalizeOrgType,
+  type Org,
+  type OrgChartItem,
+  type OrgType,
+  type Point
+} from './orgChart'
 
-const API_BASE = 'https://api.f3nation.com'
+const API_BASE = import.meta.env.VITE_API_BASE ?? ''
 const API_KEY = 'f3-org-map'
 const CLIENT_HEADER = 'scalar-api'
 
-type OrgType = 'nation' | 'sector' | 'area' | 'region' | 'ao'
+type OrgPosition = {
+  title?: string
+  f3Name?: string
+  avatarLogo?: string
+  avatar?: string
+  logo?: string
+  avatar_url?: string
+}
 
-type Org = {
+type OrgInfo = {
   id: number
-  parentId?: number | null
   name: string
   orgType: OrgType
   email?: string | null
@@ -20,34 +35,8 @@ type Org = {
   twitter?: string | null
   facebook?: string | null
   instagram?: string | null
-  meta?: Record<string, unknown> | null
-  isActive?: boolean
+  positions?: OrgPosition[]
 }
-
-type Location = {
-  id: number
-  name: string
-  latitude?: number | null
-  longitude?: number | null
-  isActive?: boolean
-}
-
-type Event = {
-  id: number
-  locationId?: number | null
-  isActive?: boolean
-  parents?: Array<{ parentId: number; parentName: string }>
-  regions?: Array<{ regionId: number; regionName: string }>
-}
-
-type Position = {
-  title?: string
-  name?: string
-  email?: string
-  phone?: string
-}
-
-type Point = { lat: number; lng: number }
 
 const app = document.querySelector<HTMLDivElement>('#app')
 if (!app) {
@@ -78,10 +67,24 @@ app.innerHTML = `
           <div class="map-loading-text">Loading map data...</div>
         </div>
       </section>
-      <aside class="info" id="info">
-        <div class="info-title">Loading organizations...</div>
-        <div class="info-body"></div>
-      </aside>
+      <div class="sidebar">
+        <div class="search" id="search">
+          <label class="search-label" for="org-search">Search</label>
+          <input
+            id="org-search"
+            class="search-input"
+            type="search"
+            placeholder="Search sectors, areas, regions"
+            autocomplete="off"
+            disabled
+          />
+          <div class="search-results is-hidden" id="search-results" role="listbox"></div>
+        </div>
+        <aside class="info" id="info">
+          <div class="info-title">Loading organizations...</div>
+          <div class="info-body"></div>
+        </aside>
+      </div>
     </main>
   </div>
 `
@@ -104,6 +107,9 @@ const breadcrumbEl = document.querySelector<HTMLDivElement>('#breadcrumb')!
 const backBtn = document.querySelector<HTMLButtonElement>('#back-btn')!
 const layersContainer = document.querySelector<HTMLDivElement>('#layers')!
 const mapLoadingEl = document.querySelector<HTMLDivElement>('#map-loading')!
+const searchInput = document.querySelector<HTMLInputElement>('#org-search')!
+const searchResults = document.querySelector<HTMLDivElement>('#search-results')!
+const searchContainer = document.querySelector<HTMLDivElement>('#search')!
 
 function setMapLoading(isLoading: boolean, message: string = 'Loading map data...') {
   if (!mapLoadingEl) return
@@ -138,9 +144,22 @@ let selectedPath: Org[] = []
 const orgById = new Map<number, Org>()
 const childrenByParent = new Map<number, Org[]>()
 const orgDescendantsCache = new Map<number, number[]>()
-const locationById = new Map<number, Location>()
-const eventsByOrgId = new Map<number, Event[]>()
+const orgPointsById = new Map<number, Point[]>()
+const orgMetricsById = new Map<number, { events: number; aos: number; locations: number }>()
 const orgColors = new Map<number, string>()
+const orgInfoCache = new Map<number, OrgInfo>()
+const orgInfoPending = new Map<number, Promise<OrgInfo>>()
+let activeInfoOrgId: number | null = null
+let searchIndex: Org[] = []
+const UNKNOWN_AVATAR_SVG =
+  'data:image/svg+xml;utf8,' +
+  encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80">' +
+      '<rect width="80" height="80" rx="16" fill="#f1ead7"/>' +
+      '<circle cx="40" cy="30" r="16" fill="#9ca3af"/>' +
+      '<path d="M16 70c3-16 17-26 24-26s21 10 24 26" fill="#9ca3af"/>' +
+    '</svg>'
+  )
 
 function generateRandomColor(): string {
   const letters = '0123456789ABCDEF'
@@ -151,6 +170,157 @@ function generateRandomColor(): string {
   return color
 }
 
+function fuzzyScore(query: string, target: string): number | null {
+  const trimmedQuery = query.trim().toLowerCase()
+  if (!trimmedQuery) return null
+  const haystack = target.toLowerCase()
+  let score = 0
+  let streak = 0
+  let qIndex = 0
+
+  for (let i = 0; i < haystack.length && qIndex < trimmedQuery.length; i += 1) {
+    if (haystack[i] === trimmedQuery[qIndex]) {
+      score += 1 + streak
+      if (i === 0 || haystack[i - 1] === ' ' || haystack[i - 1] === '-') {
+        score += 2
+      }
+      streak += 1
+      qIndex += 1
+    } else {
+      streak = 0
+    }
+  }
+
+  if (qIndex < trimmedQuery.length) return null
+  return score - haystack.length * 0.01
+}
+
+function getSearchResults(query: string): Org[] {
+  const scored = searchIndex
+    .map((org) => ({ org, score: fuzzyScore(query, org.name) }))
+    .filter((item): item is { org: Org; score: number } => item.score != null)
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score
+      return a.org.name.localeCompare(b.org.name)
+    })
+  return scored.slice(0, 8).map((item) => item.org)
+}
+
+function getOrgPath(org: Org): Org[] {
+  const path: Org[] = []
+  let current: Org | undefined = org
+  while (current) {
+    path.unshift(current)
+    current = current.parentId ? orgById.get(current.parentId) : undefined
+  }
+  return path
+}
+
+function getFocusBounds(org: Org): L.LatLngBounds | undefined {
+  const points = getOrgPoints(org)
+  if (points.length === 0) return undefined
+  if (points.length < 3) {
+    let center = { lat: points[0].lat, lng: points[0].lng }
+    if (points.length === 2) {
+      center = {
+        lat: (points[0].lat + points[1].lat) / 2,
+        lng: (points[0].lng + points[1].lng) / 2
+      }
+    }
+    const circlePoints = createCircleBuffer(center, 0.6)
+    return L.latLngBounds(circlePoints.map((point) => L.latLng(point.lat, point.lng)))
+  }
+  return L.latLngBounds(points.map((point) => L.latLng(point.lat, point.lng)))
+}
+
+function navigateToOrg(org: Org) {
+  const levelIndex = levelOrder.indexOf(org.orgType)
+  if (levelIndex === -1) return
+
+  if (org.orgType === 'sector') {
+    selectedPath = []
+    currentLevelIndex = 0
+  } else {
+    const path = getOrgPath(org).filter((item) => item.orgType !== 'nation')
+    selectedPath = path.slice(0, -1)
+    currentLevelIndex = levelIndex
+  }
+
+  updateUrlState()
+  renderLevel(getFocusBounds(org))
+  loadOrgInfo(org)
+}
+
+function clearSearchResults() {
+  searchResults.innerHTML = ''
+  searchResults.classList.add('is-hidden')
+}
+
+function renderSearchResults(orgs: Org[]) {
+  searchResults.classList.remove('is-hidden')
+  if (orgs.length === 0) {
+    searchResults.innerHTML = '<div class="search-empty">No matches</div>'
+    return
+  }
+
+  searchResults.innerHTML = orgs
+    .map((org) => {
+      return `
+        <button class="search-item" type="button" data-org-id="${org.id}" role="option">
+          <span class="search-name">${org.name}</span>
+          <span class="search-type">${org.orgType.toUpperCase()}</span>
+        </button>
+      `
+    })
+    .join('')
+
+  searchResults.querySelectorAll<HTMLButtonElement>('.search-item').forEach((button) => {
+    button.addEventListener('click', () => {
+      const orgId = parseInt(button.dataset.orgId ?? '', 10)
+      const org = orgById.get(orgId)
+      if (!org) return
+      searchInput.value = org.name
+      clearSearchResults()
+      navigateToOrg(org)
+    })
+  })
+}
+
+searchInput.addEventListener('input', () => {
+  const query = searchInput.value
+  if (!query.trim()) {
+    clearSearchResults()
+    return
+  }
+  renderSearchResults(getSearchResults(query))
+})
+
+searchInput.addEventListener('focus', () => {
+  if (searchInput.value.trim()) {
+    searchInput.select()
+  }
+})
+
+searchInput.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') {
+    const results = getSearchResults(searchInput.value)
+    if (results.length > 0) {
+      clearSearchResults()
+      navigateToOrg(results[0])
+    }
+  }
+  if (event.key === 'Escape') {
+    clearSearchResults()
+    searchInput.blur()
+  }
+})
+
+document.addEventListener('click', (event) => {
+  const target = event.target as Node
+  if (!searchContainer.contains(target)) {
+    clearSearchResults()
+  }
+})
 function getOrgColor(orgId: number): string {
   if (orgColors.has(orgId)) {
     return orgColors.get(orgId)!
@@ -161,7 +331,7 @@ function getOrgColor(orgId: number): string {
 }
 
 async function apiGet<T>(path: string, params?: Record<string, string | number | boolean | Array<string | number>>): Promise<T> {
-  const url = new URL(`${API_BASE}${path}`)
+  const url = API_BASE ? new URL(`${API_BASE}${path}`) : new URL(path, window.location.origin)
   if (params) {
     Object.entries(params).forEach(([key, value]) => {
       if (Array.isArray(value)) {
@@ -208,26 +378,6 @@ function extractItems<T>(payload: unknown): T[] {
   }
 
   return []
-}
-
-async function fetchPaged<T>(path: string, params: Record<string, string | number | boolean | Array<string | number>>): Promise<T[]> {
-  const results: T[] = []
-  const pageSize = 1000
-  let pageIndex = 0
-
-  while (true) {
-    const payload = await apiGet<unknown>(path, { ...params, pageIndex, pageSize })
-    const items = extractItems<T>(payload)
-    results.push(...items)
-
-    if (items.length < pageSize) {
-      break
-    }
-
-    pageIndex += 1
-  }
-
-  return results
 }
 
 function isSectorInternational(org: Org): boolean {
@@ -285,10 +435,6 @@ function restoreStateFromUrl() {
   }
 }
 
-function getPositions(): Position[] {
-  return []
-}
-
 function formatNumber(value: number): string {
   return new Intl.NumberFormat('en-US').format(value)
 }
@@ -300,29 +446,25 @@ function formatDecimal(value: number, fractionDigits = 1): string {
   }).format(value)
 }
 
-function renderInfo(org: Org) {
-  const positions = getPositions()
+function renderInfo(org: Org, detail?: OrgInfo) {
+  const positions = detail?.positions ?? []
   const descendantIds = getDescendantOrgIds(org.id)
   const descendantOrgs = descendantIds
     .map((id) => orgById.get(id))
     .filter((item): item is Org => item !== undefined)
-  const eventIds = new Set<number>()
-  const locationIds = new Set<number>()
+  let eventsCount = 0
+  let aoCount = 0
+  let locationsCount = 0
   descendantIds.forEach((id) => {
-    const events = eventsByOrgId.get(id) ?? []
-    events.forEach((event) => {
-      eventIds.add(event.id)
-      if (event.locationId != null) {
-        locationIds.add(event.locationId)
-      }
-    })
+    const metrics = orgMetricsById.get(id)
+    if (!metrics) return
+    eventsCount += metrics.events
+    aoCount += metrics.aos
+    locationsCount += metrics.locations
   })
   const sectorCount = descendantOrgs.filter((item) => item.orgType === 'sector').length
   const areaCount = descendantOrgs.filter((item) => item.orgType === 'area').length
   const regionCount = descendantOrgs.filter((item) => item.orgType === 'region').length
-  const aoCount = descendantOrgs.filter((item) => item.orgType === 'ao').length
-  const eventsCount = eventIds.size
-  const locationsCount = locationIds.size
   const formattedAreaCount = formatNumber(areaCount)
   const formattedRegionCount = formatNumber(regionCount)
   const formattedSectorCount = formatNumber(sectorCount)
@@ -330,7 +472,7 @@ function renderInfo(org: Org) {
   const formattedEventsCount = formatNumber(eventsCount)
   const formattedLocationsCount = formatNumber(locationsCount)
   let regionFootprint: number | null = null
-  if (org.orgType === 'region') {
+  if ((detail?.orgType ?? org.orgType) === 'region') {
     const regionPoints = getOrgPoints(org)
     if (regionPoints.length >= 3) {
       const hull = convexHull(regionPoints)
@@ -342,8 +484,8 @@ function renderInfo(org: Org) {
       }
     }
   }
-  const emailDisplay = org.email 
-    ? `<a href="mailto:${org.email}" class="info-link">${org.email}</a>`
+  const emailDisplay = detail?.email 
+    ? `<a href="mailto:${detail.email}" class="info-link">${detail.email}</a>`
     : 'Not listed'
   
   const socialLinks: string[] = []
@@ -352,17 +494,17 @@ function renderInfo(org: Org) {
   const facebookIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="info-icon" aria-hidden="true"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path></svg>'
   const instagramIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="info-icon" aria-hidden="true"><rect width="20" height="20" x="2" y="2" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" x2="17.51" y1="6.5" y2="6.5"></line></svg>'
 
-  if (org.website) {
-    socialLinks.push(`<a href="${org.website}" target="_blank" rel="noopener noreferrer" class="info-icon-link" title="Website" aria-label="Website">${globeIcon}</a>`)
+  if (detail?.website) {
+    socialLinks.push(`<a href="${detail.website}" target="_blank" rel="noopener noreferrer" class="info-icon-link" title="Website" aria-label="Website">${globeIcon}</a>`)
   }
-  if (org.twitter) {
-    socialLinks.push(`<a href="${org.twitter}" target="_blank" rel="noopener noreferrer" class="info-icon-link" title="X (Twitter)" aria-label="X (Twitter)">${twitterIcon}</a>`)
+  if (detail?.twitter) {
+    socialLinks.push(`<a href="${detail.twitter}" target="_blank" rel="noopener noreferrer" class="info-icon-link" title="X (Twitter)" aria-label="X (Twitter)">${twitterIcon}</a>`)
   }
-  if (org.facebook) {
-    socialLinks.push(`<a href="${org.facebook}" target="_blank" rel="noopener noreferrer" class="info-icon-link" title="Facebook" aria-label="Facebook">${facebookIcon}</a>`)
+  if (detail?.facebook) {
+    socialLinks.push(`<a href="${detail.facebook}" target="_blank" rel="noopener noreferrer" class="info-icon-link" title="Facebook" aria-label="Facebook">${facebookIcon}</a>`)
   }
-  if (org.instagram) {
-    socialLinks.push(`<a href="${org.instagram}" target="_blank" rel="noopener noreferrer" class="info-icon-link" title="Instagram" aria-label="Instagram">${instagramIcon}</a>`)
+  if (detail?.instagram) {
+    socialLinks.push(`<a href="${detail.instagram}" target="_blank" rel="noopener noreferrer" class="info-icon-link" title="Instagram" aria-label="Instagram">${instagramIcon}</a>`)
   }
   
   const socialMarkup = socialLinks.length > 0 
@@ -373,16 +515,17 @@ function renderInfo(org: Org) {
     ? positions
         .map((pos) => {
           const title = pos.title ?? 'Leader'
-          const name = pos.name ?? 'Unknown'
-          const contact = pos.email ?? pos.phone ?? 'No contact listed'
-          return `<li><div class="info-role">${title}</div><div class="info-person">${name}</div><div class="info-contact">${contact}</div></li>`
+          const name = pos.f3Name ?? 'Unknown'
+          const avatar = pos.avatar_url ?? pos.avatarLogo ?? pos.avatar ?? pos.logo ?? UNKNOWN_AVATAR_SVG
+          const avatarMarkup = `<img src="${avatar}" alt="${name}" class="info-avatar" loading="lazy" />`
+          return `<li class="info-position">${avatarMarkup}<div><div class="info-role">${title}</div><div class="info-person">${name}</div></div></li>`
         })
         .join('')
-    : '<li class="info-empty">No positions listed (coming soon).</li>'
+    : '<li class="info-empty">No positions listed.</li>'
 
   infoPanel.innerHTML = `
-    <div class="info-title">${org.name}</div>
-    <div class="info-subtitle">${org.orgType.toUpperCase()}</div>
+    <div class="info-title">${detail?.name ?? org.name}</div>
+    <div class="info-subtitle">${(detail?.orgType ?? org.orgType).toUpperCase()}</div>
     <div class="info-section">
       <div class="info-label">Organization Email</div>
       <div class="info-value">${emailDisplay}</div>
@@ -391,9 +534,9 @@ function renderInfo(org: Org) {
     <div class="info-section">
       <div class="info-label">Counts</div>
       <div class="info-value">
-        ${org.orgType === 'nation' ? `<div>Sectors: ${formattedSectorCount}</div>` : ''}
-        ${org.orgType === 'nation' || org.orgType === 'sector' ? `<div>Areas: ${formattedAreaCount}</div>` : ''}
-        ${org.orgType === 'nation' || org.orgType === 'sector' || org.orgType === 'area' ? `<div>Regions: ${formattedRegionCount}</div>` : ''}
+        ${(detail?.orgType ?? org.orgType) === 'nation' ? `<div>Sectors: ${formattedSectorCount}</div>` : ''}
+        ${(detail?.orgType ?? org.orgType) === 'nation' || (detail?.orgType ?? org.orgType) === 'sector' ? `<div>Areas: ${formattedAreaCount}</div>` : ''}
+        ${(detail?.orgType ?? org.orgType) === 'nation' || (detail?.orgType ?? org.orgType) === 'sector' || (detail?.orgType ?? org.orgType) === 'area' ? `<div>Regions: ${formattedRegionCount}</div>` : ''}
         <div>Events: ${formattedEventsCount}</div>
         <div>AOs: ${formattedAoCount}</div>
         <div>Locations: ${formattedLocationsCount}</div>
@@ -414,10 +557,17 @@ function renderPlaceholder(message: string) {
   `
 }
 
+function renderLoadingInfo(org: Org) {
+  infoPanel.innerHTML = `
+    <div class="info-title">${org.name}</div>
+    <div class="info-body">Loadings...</div>
+  `
+}
+
 function displayNationInfo() {
   const nationOrg = orgById.get(1)
   if (nationOrg) {
-    renderInfo(nationOrg)
+    loadOrgInfo(nationOrg)
   }
 }
 
@@ -451,20 +601,55 @@ function getDescendantOrgIds(orgId: number): number[] {
 function getOrgPoints(org: Org): Point[] {
   const orgIds = getDescendantOrgIds(org.id)
   const points: Point[] = []
-  const seenLocationIds = new Set<number>()
+  const seenOrgIds = new Set<number>()
 
   orgIds.forEach((descendantId) => {
-    const events = eventsByOrgId.get(descendantId) ?? []
-    events.forEach((event) => {
-      if (!event.locationId || seenLocationIds.has(event.locationId)) return
-      const location = locationById.get(event.locationId)
-      if (!location || location.latitude == null || location.longitude == null) return
-      seenLocationIds.add(event.locationId)
-      points.push({ lat: location.latitude, lng: location.longitude })
-    })
+    if (seenOrgIds.has(descendantId)) return
+    const orgPoints = orgPointsById.get(descendantId)
+    if (!orgPoints || orgPoints.length === 0) return
+    seenOrgIds.add(descendantId)
+    points.push(...orgPoints)
   })
 
   return points
+}
+
+async function loadOrgInfo(org: Org) {
+  activeInfoOrgId = org.id
+
+  if (orgInfoCache.has(org.id)) {
+    renderInfo(org, orgInfoCache.get(org.id))
+    return
+  }
+
+  renderLoadingInfo(org)
+
+  let pending = orgInfoPending.get(org.id)
+  if (!pending) {
+    pending = apiGet<OrgInfo>(`/v1/org-chart/${org.id}`)
+    orgInfoPending.set(org.id, pending)
+  }
+
+  try {
+    const data = await pending
+    orgInfoCache.set(org.id, data)
+    const existing = orgById.get(org.id)
+    if (existing) {
+      existing.name = data.name ?? existing.name
+      existing.orgType = normalizeOrgType(data.orgType, existing.orgType)
+    }
+  } catch (error) {
+    if (activeInfoOrgId === org.id) {
+      renderPlaceholder('Failed to load org info.')
+    }
+    console.error(error)
+  } finally {
+    orgInfoPending.delete(org.id)
+  }
+
+  if (activeInfoOrgId === org.id && orgInfoCache.has(org.id)) {
+    renderInfo(org, orgInfoCache.get(org.id))
+  }
 }
 
 function cross(o: Point, a: Point, b: Point): number {
@@ -653,7 +838,7 @@ function renderLevel(focusBounds?: L.LatLngBounds) {
 
     polygon.on('mouseover', () => {
       polygon.setStyle({ weight: 3, fillOpacity: 0.28 })
-      renderInfo(org)
+      loadOrgInfo(org)
     })
 
     polygon.on('mouseout', () => {
@@ -722,58 +907,50 @@ async function init() {
   setMapLoading(true, 'Loading organizations...')
   renderPlaceholder('Loading organizations...')
 
-  const [orgs, locations, events] = await Promise.all([
-    fetchPaged<Org>('/v1/org', {
-      orgTypes: ['nation', 'sector', 'area', 'region', 'ao'],
-      statuses: ['active']
-    }),
-    fetchPaged<Location>('/v1/location', {
-      statuses: ['active']
-    }),
-    fetchPaged<Event>('/v1/event', {
-      statuses: ['active']
-    })
-  ])
+  const payload = await apiGet<unknown>('/v1/org-chart')
+  const items = extractItems<OrgChartItem>(payload)
 
-  console.log(`Loaded ${orgs.length} orgs, ${locations.length} locations, ${events.length} events`)
+  console.log(`Loaded ${items.length} orgs from /org-chart`)
+
+  const orgs = buildOrgHierarchy(items)
 
   orgs.forEach((org) => {
     orgById.set(org.id, org)
   })
 
-  const sectors = orgs.filter(o => o.orgType === 'sector')
-  console.log(`Found ${sectors.length} sectors:`, sectors.map(s => ({ id: s.id, name: s.name })))
+  searchIndex = orgs.filter((org) => org.orgType === 'sector' || org.orgType === 'area' || org.orgType === 'region')
+  searchInput.disabled = false
+
+  items.forEach((item) => {
+    const itemId = item.id ?? item.orgId
+    if (itemId == null) return
+    const points = getOrgPointsFromItem(item)
+    if (points.length === 0) return
+    orgPointsById.set(itemId, points)
+  })
+
+  items.forEach((item) => {
+    const itemId = item.id ?? item.orgId
+    if (itemId == null) return
+    let events = 0
+    let aos = 0
+    let locations = 0
+    if (Array.isArray(item.activeLocations)) {
+      item.activeLocations.forEach((loc) => {
+        locations += 1
+        if (typeof loc.eventCount === 'number') {
+          events += loc.eventCount
+        }
+        if (typeof loc.aoCount === 'number') {
+          aos += loc.aoCount
+        }
+      })
+    }
+    orgMetricsById.set(itemId, { events, aos, locations })
+  })
 
   buildChildrenMap(orgs)
   orgDescendantsCache.clear()
-
-  locations.forEach((location) => {
-    locationById.set(location.id, location)
-  })
-
-  events.forEach((event) => {
-    const orgIds: number[] = []
-
-    if (event.parents) {
-      event.parents.forEach((p) => orgIds.push(p.parentId))
-    }
-    if (event.regions) {
-      event.regions.forEach((r) => orgIds.push(r.regionId))
-    }
-
-    orgIds.forEach((orgId) => {
-      const list = eventsByOrgId.get(orgId) ?? []
-      list.push(event)
-      eventsByOrgId.set(orgId, list)
-    })
-  })
-
-  console.log(`Events mapped to ${eventsByOrgId.size} orgs`)
-
-  sectors.forEach(sector => {
-    const points = getOrgPoints(sector)
-    console.log(`Sector "${sector.name}" (${sector.id}): ${points.length} points`)
-  })
 
   restoreStateFromUrl()
   renderLevel()

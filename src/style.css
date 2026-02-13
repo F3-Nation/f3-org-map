@@ -157,6 +157,12 @@ body {
   padding: 1.5rem 2rem 2rem;
 }
 
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
 .map {
   position: relative;
   min-height: 70vh;
@@ -198,6 +204,105 @@ body {
 
 .map-loading-text {
   font-size: 0.95rem;
+}
+
+.search {
+  background: var(--f3-card);
+  border-radius: 18px;
+  padding: 1rem 1.25rem;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  position: relative;
+  z-index: 20;
+}
+
+.search-label {
+  font-size: 0.75rem;
+  color: var(--f3-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.search-input {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid var(--f3-border);
+  padding: 0.55rem 0.75rem;
+  font-size: 0.95rem;
+  font-family: inherit;
+  outline: none;
+  background: #ffffff;
+  color: var(--f3-ink);
+}
+
+.search-input:focus {
+  border-color: var(--f3-gold);
+  box-shadow: 0 0 0 2px rgba(183, 13, 6, 0.15);
+}
+
+.search-input:disabled {
+  background: #f3f4f6;
+  color: var(--f3-muted);
+}
+
+.search-results {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  left: 1.25rem;
+  right: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  max-height: 220px;
+  overflow-y: auto;
+  background: var(--f3-card);
+  border-radius: 14px;
+  padding: 0.6rem;
+  box-shadow: 0 16px 30px rgba(15, 23, 42, 0.16);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.search-results.is-hidden {
+  display: none;
+}
+
+.search-item {
+  border: 1px solid var(--f3-border);
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 0.55rem 0.7rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  text-align: left;
+  cursor: pointer;
+  transition: border 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.search-item:hover {
+  border-color: rgba(183, 13, 6, 0.5);
+  box-shadow: 0 6px 16px rgba(183, 13, 6, 0.12);
+  transform: translateY(-1px);
+}
+
+.search-name {
+  font-weight: 600;
+  color: var(--f3-ink);
+}
+
+.search-type {
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--f3-muted);
+}
+
+.search-empty {
+  font-size: 0.85rem;
+  color: var(--f3-muted);
+  padding: 0.2rem 0.1rem 0.4rem;
 }
 
 @keyframes spin {
@@ -292,6 +397,21 @@ body {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+}
+
+.info-position {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+
+.info-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  object-fit: cover;
+  background: #f1ead7;
+  flex-shrink: 0;
 }
 
 .info-role {

@@ -12,6 +12,7 @@ Static TypeScript map app that visualizes F3 sectors, areas, regions, and AOs us
 1. Install dependencies: `npm install`
 2. Start dev server: `npm run dev`
 3. Build: `npm run build`
+4. Run tests: `npm run test`
 
 ## Deployment
 This project is ready for static hosting (e.g., GitHub Pages). Set Vite base path if needed for your deployment target.
