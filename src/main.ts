@@ -12,18 +12,14 @@ import {
   type OrgType,
   type Point
 } from './orgChart'
-
-const API_BASE = import.meta.env.VITE_API_BASE ?? ''
-const API_KEY = 'f3-org-map'
-const CLIENT_HEADER = 'scalar-api'
+import { apiGet } from './api'
+import { fuzzyScore, convexHull } from './utils'
+import { updateUrlState, restoreStateFromUrl, levelOrder, currentLevelIndex as stateCurrentLevelIndex, selectedPath as stateSelectedPath } from './state'
 
 type OrgPosition = {
   title?: string
   f3Name?: string
-  avatarLogo?: string
-  avatar?: string
-  logo?: string
-  avatar_url?: string
+  avatarUrl?: string
 }
 
 type OrgInfo = {
@@ -56,7 +52,6 @@ app.innerHTML = `
         <button class="layer-btn" data-level="2">Regions</button>
       </div>
       <div class="controls">
-        <button id="back-btn" class="btn" type="button" disabled>Back</button>
         <div id="breadcrumb" class="breadcrumb"></div>
       </div>
     </header>
@@ -104,7 +99,6 @@ L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
 const layerGroup = L.layerGroup().addTo(map)
 const infoPanel = document.querySelector<HTMLDivElement>('#info')!
 const breadcrumbEl = document.querySelector<HTMLDivElement>('#breadcrumb')!
-const backBtn = document.querySelector<HTMLButtonElement>('#back-btn')!
 const layersContainer = document.querySelector<HTMLDivElement>('#layers')!
 const mapLoadingEl = document.querySelector<HTMLDivElement>('#map-loading')!
 const searchInput = document.querySelector<HTMLInputElement>('#org-search')!
@@ -137,9 +131,9 @@ layersContainer.querySelectorAll('.layer-btn').forEach((btn) => {
   })
 })
 
-const levelOrder: OrgType[] = ['sector', 'area', 'region', 'ao']
-let currentLevelIndex = 0
-let selectedPath: Org[] = []
+// State logic now in state.ts
+let currentLevelIndex = stateCurrentLevelIndex
+let selectedPath: Org[] = stateSelectedPath
 
 const orgById = new Map<number, Org>()
 const childrenByParent = new Map<number, Org[]>()
@@ -168,31 +162,6 @@ function generateRandomColor(): string {
     color += letters[Math.floor(Math.random() * 16)]
   }
   return color
-}
-
-function fuzzyScore(query: string, target: string): number | null {
-  const trimmedQuery = query.trim().toLowerCase()
-  if (!trimmedQuery) return null
-  const haystack = target.toLowerCase()
-  let score = 0
-  let streak = 0
-  let qIndex = 0
-
-  for (let i = 0; i < haystack.length && qIndex < trimmedQuery.length; i += 1) {
-    if (haystack[i] === trimmedQuery[qIndex]) {
-      score += 1 + streak
-      if (i === 0 || haystack[i - 1] === ' ' || haystack[i - 1] === '-') {
-        score += 2
-      }
-      streak += 1
-      qIndex += 1
-    } else {
-      streak = 0
-    }
-  }
-
-  if (qIndex < trimmedQuery.length) return null
-  return score - haystack.length * 0.01
 }
 
 function getSearchResults(query: string): Org[] {
@@ -330,32 +299,6 @@ function getOrgColor(orgId: number): string {
   return color
 }
 
-async function apiGet<T>(path: string, params?: Record<string, string | number | boolean | Array<string | number>>): Promise<T> {
-  const url = API_BASE ? new URL(`${API_BASE}${path}`) : new URL(path, window.location.origin)
-  if (params) {
-    Object.entries(params).forEach(([key, value]) => {
-      if (Array.isArray(value)) {
-        value.forEach((item, index) => url.searchParams.append(`${key}[${index}]`, String(item)))
-      } else {
-        url.searchParams.set(key, String(value))
-      }
-    })
-  }
-
-  const response = await fetch(url.toString(), {
-    headers: {
-      Authorization: `Bearer ${API_KEY}`,
-      client: CLIENT_HEADER
-    }
-  })
-
-  if (!response.ok) {
-    throw new Error(`API request failed: ${response.status} ${response.statusText}`)
-  }
-
-  return (await response.json()) as T
-}
-
 function extractItems<T>(payload: unknown): T[] {
   if (!payload) return []
   if (Array.isArray(payload)) return payload as T[]
@@ -386,53 +329,6 @@ function isSectorInternational(org: Org): boolean {
 
 function isGeneralInternationalArea(org: Org): boolean {
   return org.orgType === 'area' && org.name.trim().toLowerCase() === 'general international area'
-}
-
-function updateUrlState() {
-  const params = new URLSearchParams()
-  
-  if (selectedPath.length > 0) {
-    const lastOrg = selectedPath[selectedPath.length - 1]
-    params.set('org', String(lastOrg.id))
-  } else {
-    params.set('level', String(currentLevelIndex))
-  }
-  
-  window.history.replaceState(null, '', `?${params.toString()}`)
-}
-
-function restoreStateFromUrl() {
-  const params = new URLSearchParams(window.location.search)
-  const orgParam = params.get('org')
-  const levelParam = params.get('level')
-  
-  if (orgParam) {
-    const orgId = parseInt(orgParam, 10)
-    const org = orgById.get(orgId)
-    
-    if (org) {
-      // Build the full path by walking up the parent chain
-      const path: Org[] = []
-      let current: Org | undefined = org
-      
-      while (current) {
-        path.unshift(current)
-        current = current.parentId ? orgById.get(current.parentId) : undefined
-      }
-      
-      // Filter out Nation org since it's already shown in the breadcrumb
-      selectedPath = path.filter((o) => o.orgType !== 'nation')
-      
-      // Derive the level - show children of the selected org, not the org itself
-      const levelIndex = levelOrder.indexOf(org.orgType)
-      if (levelIndex !== -1) {
-        currentLevelIndex = levelIndex + 1
-      }
-    }
-  } else if (levelParam) {
-    currentLevelIndex = parseInt(levelParam, 10)
-    selectedPath = []
-  }
 }
 
 function formatNumber(value: number): string {
@@ -516,7 +412,7 @@ function renderInfo(org: Org, detail?: OrgInfo) {
         .map((pos) => {
           const title = pos.title ?? 'Leader'
           const name = pos.f3Name ?? 'Unknown'
-          const avatar = pos.avatar_url ?? pos.avatarLogo ?? pos.avatar ?? pos.logo ?? UNKNOWN_AVATAR_SVG
+          const avatar = pos.avatarUrl ?? UNKNOWN_AVATAR_SVG
           const avatarMarkup = `<img src="${avatar}" alt="${name}" class="info-avatar" loading="lazy" />`
           return `<li class="info-position">${avatarMarkup}<div><div class="info-role">${title}</div><div class="info-person">${name}</div></div></li>`
         })
@@ -652,10 +548,6 @@ async function loadOrgInfo(org: Org) {
   }
 }
 
-function cross(o: Point, a: Point, b: Point): number {
-  return (a.lng - o.lng) * (b.lat - o.lat) - (a.lat - o.lat) * (b.lng - o.lng)
-}
-
 function createStarPolygon(center: { lat: number; lng: number }, radiusDegrees: number, points: number = 5): Point[] {
   const star: Point[] = []
   const outerRadius = radiusDegrees
@@ -685,81 +577,6 @@ function createCircleBuffer(center: { lat: number; lng: number }, radiusDegrees:
   return circle
 }
 
-function convexHull(points: Point[]): Point[] {
-  if (points.length <= 1) return points
-
-  const sorted = [...points].sort((p1, p2) => (p1.lng === p2.lng ? p1.lat - p2.lat : p1.lng - p2.lng))
-  const lower: Point[] = []
-
-  for (const point of sorted) {
-    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], point) <= 0) {
-      lower.pop()
-    }
-    lower.push(point)
-  }
-
-  const upper: Point[] = []
-  for (let i = sorted.length - 1; i >= 0; i -= 1) {
-    const point = sorted[i]
-    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], point) <= 0) {
-      upper.pop()
-    }
-    upper.push(point)
-  }
-
-  upper.pop()
-  lower.pop()
-  return lower.concat(upper)
-}
-
-function renderBreadcrumb() {
-  const crumbs = [
-    { label: 'Nation', depth: -1 },
-    ...selectedPath.map((org, idx) => ({ label: org.name, depth: idx }))
-  ]
-  
-  const crumbHtml = crumbs
-    .map((crumb, idx) => {
-      const isLast = idx === crumbs.length - 1
-      const isNation = crumb.depth === -1
-      // Mark as non-clickable only if it's the last crumb AND not Nation
-      const isNonClickable = isLast && !isNation
-      return `<span class="breadcrumb-crumb${isNonClickable ? ' breadcrumb-current' : ''}" data-depth="${crumb.depth}">${crumb.label}</span>`
-    })
-    .join(' <span class="breadcrumb-sep">/</span> ')
-  
-  breadcrumbEl.innerHTML = crumbHtml
-  backBtn.disabled = selectedPath.length === 0
-  
-  // Add click handlers to all clickable breadcrumbs
-  // All breadcrumbs are clickable except the last one (unless it's Nation)
-  breadcrumbEl.querySelectorAll('.breadcrumb-crumb').forEach((crumb) => {
-    const isNationCrumb = (crumb as HTMLElement).dataset.depth === '-1'
-    const isCurrentStyle = crumb.classList.contains('breadcrumb-current')
-    
-    // Nation is always clickable, others only if not marked as current
-    if (isNationCrumb || !isCurrentStyle) {
-      crumb.addEventListener('click', () => {
-        const depth = parseInt((crumb as HTMLElement).dataset.depth!)
-        if (depth === -1) {
-          // Clicking Nation: show sectors on map but Nation info in sidebar
-          selectedPath = []
-          currentLevelIndex = 0
-          updateUrlState()
-          renderLevel()
-          // Display Nation info after rendering sectors
-          displayNationInfo()
-        } else {
-          selectedPath = selectedPath.slice(0, depth + 1)
-          currentLevelIndex = depth + 1
-          updateUrlState()
-          renderLevel()
-        }
-      })
-    }
-  })
-}
-
 function getCurrentLevelOrgs(): Org[] {
   const level = levelOrder[currentLevelIndex]
 
@@ -782,6 +599,46 @@ function getCurrentLevelOrgs(): Org[] {
   }
 
   return [...orgById.values()].filter((org) => org.orgType === level && org.parentId === parent.id)
+}
+
+function renderBreadcrumb() {
+  const crumbs = [
+    { label: 'Nation', depth: -1 },
+    ...selectedPath.map((org, idx) => ({ label: org.name, depth: idx }))
+  ];
+  const crumbHtml = crumbs
+    .map((crumb, idx) => {
+      const isLast = idx === crumbs.length - 1;
+      const isNation = crumb.depth === -1;
+      // Mark as non-clickable only if it's the last crumb AND not Nation
+      const isNonClickable = isLast && !isNation;
+      return `<span class="breadcrumb-crumb${isNonClickable ? ' breadcrumb-current' : ''}" data-depth="${crumb.depth}">${crumb.label}</span>`;
+    })
+    .join(' <span class="breadcrumb-sep">/</span> ');
+  breadcrumbEl.innerHTML = crumbHtml;
+  // Add click handlers to all clickable breadcrumbs
+  // All breadcrumbs are clickable except the last one (unless it's Nation)
+  breadcrumbEl.querySelectorAll('.breadcrumb-crumb').forEach((crumb) => {
+    const depth = parseInt((crumb as HTMLElement).dataset.depth!);
+    crumb.addEventListener('click', () => {
+      if (depth === -1) {
+        // Clicking Nation: show sectors on map but Nation info in sidebar
+        selectedPath = [];
+        currentLevelIndex = 0;
+        updateUrlState();
+        renderLevel();
+        displayNationInfo();
+      } else {
+        selectedPath = selectedPath.slice(0, depth + 1);
+        currentLevelIndex = depth + 1;
+        updateUrlState();
+        renderLevel();
+        // Show info for the org at this breadcrumb
+        const org = selectedPath[selectedPath.length - 1];
+        if (org) loadOrgInfo(org);
+      }
+    });
+  });
 }
 
 function renderLevel(focusBounds?: L.LatLngBounds) {
@@ -891,17 +748,6 @@ function renderLevel(focusBounds?: L.LatLngBounds) {
   }
 }
 
-backBtn.addEventListener('click', () => {
-  if (selectedPath.length === 0) return
-  selectedPath = selectedPath.slice(0, -1)
-  currentLevelIndex = Math.max(0, currentLevelIndex - 1)
-  const focusOrg = selectedPath[selectedPath.length - 1]
-  const focusPoints = focusOrg ? getOrgPoints(focusOrg) : []
-  const focusHull = focusPoints.length >= 3 ? convexHull(focusPoints) : []
-  const focusBounds = focusHull.length >= 3 ? L.latLngBounds(focusHull.map((p) => L.latLng(p.lat, p.lng))) : undefined
-  updateUrlState()
-  renderLevel(focusBounds)
-})
 
 async function init() {
   setMapLoading(true, 'Loading organizations...')
