@@ -200,22 +200,22 @@ function getFocusBounds(org: Org): L.LatLngBounds | undefined {
 }
 
 function navigateToOrg(org: Org) {
-  const levelIndex = levelOrder.indexOf(org.orgType)
-  if (levelIndex === -1) return
+  const levelIndex = levelOrder.indexOf(org.orgType);
+  if (levelIndex === -1) return;
 
   if (org.orgType === 'sector') {
-    selectedPath.length = 0
-    currentLevelIndex = 0
+    selectedPath.length = 0;
+    setCurrentLevelIndex(0);
   } else {
-    const path = getOrgPath(org).filter((item) => item.orgType !== 'nation')
-    selectedPath.length = 0
-    selectedPath.push(...path.slice(0, -1))
-    currentLevelIndex = levelIndex
+    const path = getOrgPath(org).filter((item) => item.orgType !== 'nation');
+    selectedPath.length = 0;
+    selectedPath.push(...path.slice(0, -1));
+    setCurrentLevelIndex(levelIndex);
   }
 
-  updateUrlState()
-  renderLevel(getFocusBounds(org))
-  loadOrgInfo(org)
+  updateUrlState();
+  renderLevel(getFocusBounds(org));
+  loadOrgInfo(org);
 }
 
 function clearSearchResults() {
@@ -797,10 +797,23 @@ async function init() {
   buildChildrenMap(orgs)
   orgDescendantsCache.clear()
 
-  restoreStateFromUrl()
-  renderLevel()
-  displayNationInfo()
-  setMapLoading(false)
+  restoreStateFromUrl(orgById);
+  renderLevel();
+  // Show info for org in URL if present, else Nation
+  const params = new URLSearchParams(window.location.search);
+  const orgParam = params.get('org');
+  if (orgParam) {
+    const orgId = parseInt(orgParam, 10);
+    const org = orgById.get(orgId);
+    if (org) {
+      loadOrgInfo(org);
+    } else {
+      displayNationInfo();
+    }
+  } else {
+    displayNationInfo();
+  }
+  setMapLoading(false);
 }
 
 init().catch((error) => {

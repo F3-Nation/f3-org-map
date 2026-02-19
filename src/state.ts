@@ -36,14 +36,25 @@ export function restoreStateFromUrl(orgById?: Map<number, Org>) {
         path.unshift(current);
         current = current.parentId ? orgById.get(current.parentId) : undefined;
       }
-      selectedPath = path.filter((o) => o.orgType !== 'nation');
-      const levelIndex = levelOrder.indexOf(org.orgType);
-      if (levelIndex !== -1) {
-        currentLevelIndex = levelIndex + 1;
+      selectedPath.length = 0;
+      selectedPath.push(...path.filter((o) => o.orgType !== 'nation'));
+      if (levelParam) {
+        setCurrentLevelIndex(parseInt(levelParam, 10));
+      } else {
+        // Default: go one level deeper than org type
+        const levelIndex = levelOrder.indexOf(org.orgType);
+        if (levelIndex !== -1) {
+          setCurrentLevelIndex(levelIndex + 1);
+        }
       }
+      return;
     }
-  } else if (levelParam) {
-    currentLevelIndex = parseInt(levelParam, 10);
-    selectedPath = [];
+  }
+  if (levelParam) {
+    setCurrentLevelIndex(parseInt(levelParam, 10));
+    selectedPath.length = 0;
+  } else {
+    setCurrentLevelIndex(0);
+    selectedPath.length = 0;
   }
 }
