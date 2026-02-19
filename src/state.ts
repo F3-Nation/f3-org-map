@@ -10,13 +10,16 @@ export let selectedPath: Org[] = [];
 
 export function updateUrlState() {
   const params = new URLSearchParams();
+  // Only add level if not 0 (root)
+  if (currentLevelIndex > 0) {
+    params.set('level', String(currentLevelIndex));
+  }
   if (selectedPath.length > 0) {
     const lastOrg = selectedPath[selectedPath.length - 1];
     params.set('org', String(lastOrg.id));
-  } else {
-    params.set('level', String(currentLevelIndex));
   }
-  window.history.replaceState(null, '', `?${params.toString()}`);
+  const query = params.toString();
+  window.history.replaceState(null, '', query ? `?${query}` : './');
 }
 
 export function restoreStateFromUrl(orgById?: Map<number, Org>) {

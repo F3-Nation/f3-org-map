@@ -14,7 +14,7 @@ import {
 } from './orgChart'
 import { apiGet } from './api'
 import { fuzzyScore, convexHull } from './utils'
-import { updateUrlState, restoreStateFromUrl, levelOrder, currentLevelIndex as stateCurrentLevelIndex, selectedPath as stateSelectedPath } from './state'
+import { updateUrlState, restoreStateFromUrl, levelOrder, currentLevelIndex, selectedPath, setCurrentLevelIndex } from './state'
 
 type OrgPosition = {
   title?: string
@@ -119,21 +119,18 @@ function setMapLoading(isLoading: boolean, message: string = 'Loading map data..
 layersContainer.querySelectorAll('.layer-btn').forEach((btn) => {
   btn.addEventListener('click', () => {
     const level = parseInt((btn as HTMLElement).dataset.level!)
-    selectedPath = []
-    currentLevelIndex = level
-    
+    selectedPath.length = 0
+    setCurrentLevelIndex(level)
     // Update active button styling
     layersContainer.querySelectorAll('.layer-btn').forEach((b) => b.classList.remove('layer-active'))
     btn.classList.add('layer-active')
-    
     updateUrlState()
     renderLevel()
   })
 })
 
 // State logic now in state.ts
-let currentLevelIndex = stateCurrentLevelIndex
-let selectedPath: Org[] = stateSelectedPath
+// Use currentLevelIndex and selectedPath from state.ts directly
 
 const orgById = new Map<number, Org>()
 const childrenByParent = new Map<number, Org[]>()
@@ -207,11 +204,12 @@ function navigateToOrg(org: Org) {
   if (levelIndex === -1) return
 
   if (org.orgType === 'sector') {
-    selectedPath = []
+    selectedPath.length = 0
     currentLevelIndex = 0
   } else {
     const path = getOrgPath(org).filter((item) => item.orgType !== 'nation')
-    selectedPath = path.slice(0, -1)
+    selectedPath.length = 0
+    selectedPath.push(...path.slice(0, -1))
     currentLevelIndex = levelIndex
   }
 
@@ -623,14 +621,14 @@ function renderBreadcrumb() {
     crumb.addEventListener('click', () => {
       if (depth === -1) {
         // Clicking Nation: show sectors on map but Nation info in sidebar
-        selectedPath = [];
-        currentLevelIndex = 0;
+        selectedPath.length = 0;
+        setCurrentLevelIndex(0);
         updateUrlState();
         renderLevel();
         displayNationInfo();
       } else {
-        selectedPath = selectedPath.slice(0, depth + 1);
-        currentLevelIndex = depth + 1;
+        selectedPath.length = depth + 1;
+        setCurrentLevelIndex(depth + 1);
         updateUrlState();
         renderLevel();
         // Show info for the org at this breadcrumb
@@ -712,22 +710,23 @@ function renderLevel(focusBounds?: L.LatLngBounds) {
       // Skip Nation org since it's already shown in the breadcrumb
       if (selectedPath.length === 0 && org.parentId) {
         const parent = orgById.get(org.parentId)
+        selectedPath.length = 0
         if (parent && parent.orgType !== 'nation') {
-          selectedPath = [parent, org]
+          selectedPath.push(parent, org)
         } else {
-          selectedPath = [org]
+          selectedPath.push(org)
         }
       } else {
-        selectedPath = [...selectedPath, org]
+        selectedPath.push(org)
       }
       
       // Skip Area level for International sector and General International Area
       if (isSectorInternational(org) || isGeneralInternationalArea(org)) {
-        currentLevelIndex = 2 // Jump to 'region' level (0=sector, 1=area, 2=region)
+        setCurrentLevelIndex(2) // Jump to 'region' level (0=sector, 1=area, 2=region)
         updateUrlState()
         renderLevel() // No focus bounds - zoom to all regions instead of the star
       } else {
-        currentLevelIndex += 1
+        setCurrentLevelIndex(currentLevelIndex + 1)
         updateUrlState()
         const focusBounds = org.orgType === 'area' ? undefined : polygon.getBounds()
         renderLevel(focusBounds)
