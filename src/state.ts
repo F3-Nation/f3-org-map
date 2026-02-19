@@ -37,7 +37,12 @@ export function restoreStateFromUrl(orgById?: Map<number, Org>) {
         current = current.parentId ? orgById.get(current.parentId) : undefined;
       }
       selectedPath.length = 0;
-      selectedPath.push(...path.filter((o) => o.orgType !== 'nation'));
+      // If org is a region, only include up to area in selectedPath
+      if (org.orgType === 'region') {
+        selectedPath.push(...path.filter((o) => o.orgType !== 'nation' && o.orgType !== 'region'));
+      } else {
+        selectedPath.push(...path.filter((o) => o.orgType !== 'nation'));
+      }
       if (levelParam) {
         setCurrentLevelIndex(parseInt(levelParam, 10));
       } else {

@@ -205,7 +205,19 @@ function navigateToOrg(org: Org) {
 
   if (org.orgType === 'sector') {
     selectedPath.length = 0;
-    setCurrentLevelIndex(0);
+    selectedPath.push(org);
+    setCurrentLevelIndex(1); // Switch to area layer
+  } else if (org.orgType === 'area') {
+    const path = getOrgPath(org).filter((item) => item.orgType !== 'nation');
+    selectedPath.length = 0;
+    selectedPath.push(...path);
+    setCurrentLevelIndex(2); // Switch to region layer
+  } else if (org.orgType === 'region') {
+    // Only show up to area in breadcrumb, not region itself
+    const path = getOrgPath(org).filter((item) => item.orgType !== 'nation' && item.orgType !== 'region');
+    selectedPath.length = 0;
+    selectedPath.push(...path);
+    setCurrentLevelIndex(levelIndex);
   } else {
     const path = getOrgPath(org).filter((item) => item.orgType !== 'nation');
     selectedPath.length = 0;
@@ -576,27 +588,32 @@ function createCircleBuffer(center: { lat: number; lng: number }, radiusDegrees:
 }
 
 function getCurrentLevelOrgs(): Org[] {
-  const level = levelOrder[currentLevelIndex]
+  const level = levelOrder[currentLevelIndex];
 
   if (level === 'sector') {
-    return [...orgById.values()]
-      .filter((org) => org.orgType === 'sector')
+    return [...orgById.values()].filter((org) => org.orgType === 'sector');
   }
 
-  const parent = selectedPath[selectedPath.length - 1]
-  
+  const parent = selectedPath[selectedPath.length - 1];
+
   // If no parent selected, show all orgs of this level (for layer button views)
   if (!parent) {
-    return [...orgById.values()].filter((org) => org.orgType === level)
+    return [...orgById.values()].filter((org) => org.orgType === level);
   }
 
   // Special handling for International: get all region descendants (not just direct children)
   if (isSectorInternational(parent) && level === 'region') {
-    const internationalDescendants = getDescendantOrgIds(parent.id)
-    return [...orgById.values()].filter((org) => org.orgType === 'region' && internationalDescendants.includes(org.id))
+    const internationalDescendants = getDescendantOrgIds(parent.id);
+    return [...orgById.values()].filter((org) => org.orgType === 'region' && internationalDescendants.includes(org.id));
   }
 
-  return [...orgById.values()].filter((org) => org.orgType === level && org.parentId === parent.id)
+  // If at region level and selectedPath points to a region, show all sibling regions (same parent)
+  if (level === 'region' && parent.orgType === 'region') {
+    const regionParentId = parent.parentId;
+    return [...orgById.values()].filter((org) => org.orgType === 'region' && org.parentId === regionParentId);
+  }
+
+  return [...orgById.values()].filter((org) => org.orgType === level && org.parentId === parent.id);
 }
 
 function renderBreadcrumb() {
@@ -631,8 +648,8 @@ function renderBreadcrumb() {
         setCurrentLevelIndex(depth + 1);
         updateUrlState();
         renderLevel();
-        // Show info for the org at this breadcrumb
-        const org = selectedPath[selectedPath.length - 1];
+        // Show info for the org at this breadcrumb (by depth)
+        const org = selectedPath[depth];
         if (org) loadOrgInfo(org);
       }
     });
@@ -653,88 +670,66 @@ function renderLevel(focusBounds?: L.LatLngBounds) {
   const allLatLngs: L.LatLng[] = []
 
   orgs.forEach((org) => {
-    let latLngs: L.LatLng[]
-    
+    let latLngs: L.LatLng[] | undefined = undefined;
     // Special handling for International sector and General International Area - create star polygon in Atlantic
     if (isSectorInternational(org) || isGeneralInternationalArea(org)) {
-      const atlanticCenter = { lat: 20, lng: -40 }
-      const starPoints = createStarPolygon(atlanticCenter, 8, 5)
-      latLngs = starPoints.map((point) => L.latLng(point.lat, point.lng))
-      allLatLngs.push(...latLngs)
+      const atlanticCenter = { lat: 20, lng: -40 };
+      const starPoints = createStarPolygon(atlanticCenter, 8, 5);
+      latLngs = starPoints.map((point) => L.latLng(point.lat, point.lng));
+      allLatLngs.push(...latLngs);
     } else {
-      const points = getOrgPoints(org)
-      
+      const points = getOrgPoints(org);
       // For regions/areas with fewer than 3 points, create a circle buffer
       if (points.length < 3) {
-        if (points.length === 0) return
-        const center = { lat: points[0].lat, lng: points[0].lng }
+        if (points.length === 0) return;
+        const center = { lat: points[0].lat, lng: points[0].lng };
         if (points.length === 2) {
-          // Average the two points
-          center.lat = (points[0].lat + points[1].lat) / 2
-          center.lng = (points[0].lng + points[1].lng) / 2
+          center.lat = (points[0].lat + points[1].lat) / 2;
+          center.lng = (points[0].lng + points[1].lng) / 2;
         }
-        const circlePoints = createCircleBuffer(center, 0.15) // ~16km radius at equator
-        latLngs = circlePoints.map((point) => L.latLng(point.lat, point.lng))
-        allLatLngs.push(...latLngs)
+        const circlePoints = createCircleBuffer(center, 0.15); // ~16km radius at equator
+        latLngs = circlePoints.map((point) => L.latLng(point.lat, point.lng));
+        allLatLngs.push(...latLngs);
       } else {
-        const hull = convexHull(points)
-        if (hull.length < 3) return
-        latLngs = hull.map((point) => L.latLng(point.lat, point.lng))
-        allLatLngs.push(...latLngs)
+        const hull = convexHull(points);
+        if (hull.length < 3) return;
+        latLngs = hull.map((point) => L.latLng(point.lat, point.lng));
+        allLatLngs.push(...latLngs);
       }
     }
-
+    // Guard: only create polygon if latLngs is valid and has at least 3 points
+    if (!latLngs || latLngs.length < 3) return;
     const polygon = L.polygon(latLngs, {
       color: getOrgColor(org.id),
       weight: 2,
       fillColor: getOrgColor(org.id),
       fillOpacity: 0.18
-    })
+    });
 
     polygon.on('mouseover', () => {
-      polygon.setStyle({ weight: 3, fillOpacity: 0.28 })
-      loadOrgInfo(org)
-    })
+      polygon.setStyle({ weight: 3, fillOpacity: 0.28 });
+      loadOrgInfo(org);
+      // If at region level, update URL to reflect hovered region
+      if (currentLevelIndex === 2) {
+        selectedPath.length = 0;
+        selectedPath.push(org);
+        updateUrlState();
+      }
+    });
 
     polygon.on('mouseout', () => {
-      polygon.setStyle({ weight: 2, fillOpacity: 0.18 })
-    })
+      polygon.setStyle({ weight: 2, fillOpacity: 0.18 });
+    });
 
     polygon.on('click', () => {
       // Regions are view-only, don't navigate on click
-      if (org.orgType === 'region') return
-      if (currentLevelIndex >= levelOrder.length - 1) return
-      
-      // If viewing all orgs of a level (no parent selected) and clicking an org with a parent,
-      // include the parent in the path for proper breadcrumb navigation
-      // Skip Nation org since it's already shown in the breadcrumb
-      if (selectedPath.length === 0 && org.parentId) {
-        const parent = orgById.get(org.parentId)
-        selectedPath.length = 0
-        if (parent && parent.orgType !== 'nation') {
-          selectedPath.push(parent, org)
-        } else {
-          selectedPath.push(org)
-        }
-      } else {
-        selectedPath.push(org)
-      }
-      
-      // Skip Area level for International sector and General International Area
-      if (isSectorInternational(org) || isGeneralInternationalArea(org)) {
-        setCurrentLevelIndex(2) // Jump to 'region' level (0=sector, 1=area, 2=region)
-        updateUrlState()
-        renderLevel() // No focus bounds - zoom to all regions instead of the star
-      } else {
-        setCurrentLevelIndex(currentLevelIndex + 1)
-        updateUrlState()
-        const focusBounds = org.orgType === 'area' ? undefined : polygon.getBounds()
-        renderLevel(focusBounds)
-      }
-    })
+      if (org.orgType === 'region') return;
+      if (currentLevelIndex >= levelOrder.length - 1) return;
+      navigateToOrg(org);
+    });
 
-    polygon.addTo(layerGroup)
-  })
+    polygon.addTo(layerGroup);
+  });
 
   if (focusBounds) {
     map.fitBounds(focusBounds, { padding: [24, 24] })
@@ -798,20 +793,34 @@ async function init() {
   orgDescendantsCache.clear()
 
   restoreStateFromUrl(orgById);
-  renderLevel();
-  // Show info for org in URL if present, else Nation
+  // Check if we should zoom to a region and show its info
   const params = new URLSearchParams(window.location.search);
   const orgParam = params.get('org');
-  if (orgParam) {
+  const levelParam = params.get('level');
+  let zoomed = false;
+  if (levelParam === '2' && orgParam) {
     const orgId = parseInt(orgParam, 10);
     const org = orgById.get(orgId);
-    if (org) {
+    if (org && org.orgType === 'region') {
+      const bounds = getFocusBounds(org);
+      renderLevel(bounds);
       loadOrgInfo(org);
+      zoomed = true;
+    }
+  }
+  if (!zoomed) {
+    renderLevel();
+    if (orgParam) {
+      const orgId = parseInt(orgParam, 10);
+      const org = orgById.get(orgId);
+      if (org) {
+        loadOrgInfo(org);
+      } else {
+        displayNationInfo();
+      }
     } else {
       displayNationInfo();
     }
-  } else {
-    displayNationInfo();
   }
   setMapLoading(false);
 }
