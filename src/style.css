@@ -1,3 +1,48 @@
+/* Tooltip for Positions help icon */
+.info-help-tooltip {
+  position: relative;
+  display: inline-block;
+  cursor: pointer;
+  /* Ensure tooltip is hidden by default */
+}
+
+.info-help-tooltip svg {
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  width: 14px;
+  height: 14px;
+  min-width: 14px;
+  min-height: 14px;
+  font-weight: 400;
+}
+
+.info-tooltip-text {
+  visibility: hidden;
+  width: 270px;
+  background: #222;
+  color: #fff;
+  text-align: left;
+  border-radius: 6px;
+  padding: 0.7em 1em;
+  position: absolute;
+  z-index: 10;
+  bottom: 125%;
+  left: 50%;
+  transform: translateX(-50%);
+  opacity: 0;
+  transition: opacity 0.2s;
+  font-size: 0.95em;
+  pointer-events: none;
+}
+
+.info-help-tooltip:hover .info-tooltip-text,
+.info-help-tooltip:focus .info-tooltip-text,
+.info-help-tooltip:focus-within .info-tooltip-text {
+  visibility: visible;
+  opacity: 1;
+  pointer-events: auto;
+}
 :root {
   font-family: 'Inter', system-ui, sans-serif;
   line-height: 1.5;

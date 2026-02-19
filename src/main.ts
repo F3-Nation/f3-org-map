@@ -450,7 +450,18 @@ function renderInfo(org: Org, detail?: OrgInfo) {
       </div>
     </div>
     <div class="info-section">
-      <div class="info-label">Positions</div>
+      <div class="info-label" style="display: flex; align-items: center; gap: 0.4em;">
+        Positions
+        <span class="info-help-tooltip" tabindex="0">
+          <svg width="14" height="14" viewBox="0 0 20 20" fill="none" aria-label="Help" style="vertical-align: middle;">
+            <circle cx="10" cy="10" r="9" stroke="#bdbdbd" stroke-width="1.2" fill="#fff"/>
+            <text x="10" y="15" text-anchor="middle" font-size="11" font-family="Arial, sans-serif" fill="#bdbdbd" font-weight="400">?</text>
+          </svg>
+          <span class="info-tooltip-text">
+            Changes: For sectors and areas, email it@f3nation.com. For regions, update in the F3 Nation Slackbot.
+          </span>
+        </span>
+      </div>
       <ul class="info-list">${positionMarkup}</ul>
     </div>
   `
