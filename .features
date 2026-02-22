@@ -1,0 +1,51 @@
+F3 Geographic Directory - Features
+
+Purpose
+- Interactive map to explore F3 organization structure and metadata.
+
+Core Map Experience
+- Renders a Leaflet map with a light basemap and world copy jump.
+- Displays polygons for sectors, areas, and regions based on org data.
+- Uses convex hulls of active locations to define boundaries.
+- Uses a small circle buffer when an org has fewer than 3 points.
+- Shows a special star polygon for the International sector and General International Area.
+- Fits map bounds to visible org polygons or to a focused org when navigating.
+
+Navigation and Drill-Down
+- Layer buttons switch between sector, area, and region views.
+- Click on a polygon drills down to the next org level (regions are view-only).
+- Breadcrumbs show the current path and allow jump-back navigation.
+- Clicking Nation breadcrumb resets to sector view and shows Nation info.
+
+Search
+- Fuzzy search across sectors, areas, and regions.
+- Search results show top matches and org type labels.
+- Enter selects the top match, click selects a specific match.
+- Search results close on Escape or outside click.
+
+Org Information Panel
+- Shows org name and org type.
+- Shows org email with mailto link when available.
+- Shows social links (website, X/Twitter, Facebook, Instagram) when available.
+- Shows counts for sectors, areas, regions, events, AOs, and locations.
+- Shows region footprint in square miles when region boundary is available.
+- Shows leadership positions with avatar, title, and F3 name.
+- Shows a help tooltip for position update guidance.
+
+Data and Metrics
+- Loads org chart data from the API and builds a hierarchy.
+- Tracks descendant orgs to aggregate event, AO, and location counts.
+- Caches org info responses to avoid duplicate API calls.
+
+URL State and Deep Linking
+- Updates URL query params with selected org and level.
+- Restores state on load from URL params.
+- If URL points to a region at region level, auto-zooms to that region.
+
+Loading and Error Handling
+- Shows a map loading overlay while data is loading.
+- Shows placeholders for loading and error states in the info panel.
+
+Notes
+- Map interactions: hover highlights polygon and updates info panel.
+- Region hover updates URL state to reflect the hovered region.
