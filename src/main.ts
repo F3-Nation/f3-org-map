@@ -22,6 +22,12 @@ type OrgPosition = {
   avatarUrl?: string
 }
 
+type OrgRole = {
+  title?: string
+  f3Name?: string
+  avatarUrl?: string
+}
+
 type OrgInfo = {
   id: number
   name: string
@@ -32,6 +38,7 @@ type OrgInfo = {
   facebook?: string | null
   instagram?: string | null
   positions?: OrgPosition[]
+  roles?: OrgRole[]
 }
 
 const app = document.querySelector<HTMLDivElement>('#app')
@@ -354,6 +361,7 @@ function formatDecimal(value: number, fractionDigits = 1): string {
 
 function renderInfo(org: Org, detail?: OrgInfo) {
   const positions = detail?.positions ?? []
+  const roles = detail?.roles ?? []
   const descendantIds = getDescendantOrgIds(org.id)
   const descendantOrgs = descendantIds
     .map((id) => orgById.get(id))
@@ -429,6 +437,18 @@ function renderInfo(org: Org, detail?: OrgInfo) {
         .join('')
     : '<li class="info-empty">No positions listed.</li>'
 
+  const roleMarkup = roles.length
+    ? roles
+        .map((role) => {
+          const title = role.title ?? 'Role'
+          const name = role.f3Name ?? 'Unknown'
+          const avatar = role.avatarUrl ?? UNKNOWN_AVATAR_SVG
+          const avatarMarkup = `<img src="${avatar}" alt="${name}" class="info-avatar" loading="lazy" />`
+          return `<li class="info-position">${avatarMarkup}<div><div class="info-role">${title}</div><div class="info-person">${name}</div></div></li>`
+        })
+        .join('')
+    : '<li class="info-empty">No roles listed.</li>'
+
   infoPanel.innerHTML = `
     <div class="info-title">${detail?.name ?? org.name}</div>
     <div class="info-subtitle">${(detail?.orgType ?? org.orgType).toUpperCase()}</div>
@@ -463,6 +483,10 @@ function renderInfo(org: Org, detail?: OrgInfo) {
         </span>
       </div>
       <ul class="info-list">${positionMarkup}</ul>
+    </div>
+    <div class="info-section">
+      <div class="info-label">Roles</div>
+      <ul class="info-list">${roleMarkup}</ul>
     </div>
   `
 }
