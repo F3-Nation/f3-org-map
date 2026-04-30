@@ -11,7 +11,7 @@ This project follows Keep a Changelog and uses Semantic Versioning.
 
 * formatted version history ([8605a9e](https://github.com/F3-Nation/f3-org-map/commit/8605a9e42dfa1580ae27896544009129f695e1f4))
 
-## 1.0.0 (2026-04-30)
+## [1.0.0](https://github.com/F3-Nation/f3-org-map/compare/v0.0.0...v1.0.0) (2026-04-30)
 
 
 ### Features
@@ -28,7 +28,7 @@ This project follows Keep a Changelog and uses Semantic Versioning.
 * Upgrade Node.js to 20 for Vite compatibility ([3313224](https://github.com/F3-Nation/f3-org-map/commit/3313224b6ba0fef486987ba4697e94bd22a5235d))
 * Use upload-pages-artifact for GitHub Pages deployment ([92f2443](https://github.com/F3-Nation/f3-org-map/commit/92f24434c9bbe3e7365b6cd97a382f34fba0f357))
 
-## [0.0.0] - 2026-04-30
+## [0.0.0](https://github.com/F3-Nation/f3-org-map/tree/v0.0.0) (2026-04-30)
 
 ### Added
 - Initial project baseline.
