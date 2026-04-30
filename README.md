@@ -94,12 +94,19 @@ Linting and formatting are powered by Biome.
 
 Commit messages must follow Conventional Commits:
 
-- `feat:` for new user-facing functionality
-- `fix:` for bug fixes
-- `chore:` for maintenance (deps, tooling, docs, etc.)
-- `docs:` for documentation-only changes
-- `refactor:` for internal code improvements without behavior change
-- `test:` for test-only changes
+| Type | Description |
+|------|-------------|
+| `feat` | A new user-facing feature |
+| `fix` | A bug fix |
+| `perf` | A code change that improves performance |
+| `refactor` | A code change that neither fixes a bug nor adds a feature |
+| `style` | Changes that don't affect code meaning (whitespace, formatting, etc.) |
+| `test` | Adding or correcting tests |
+| `docs` | Documentation-only changes |
+| `build` | Changes to the build system or external dependencies |
+| `ci` | Changes to CI configuration files and scripts |
+| `chore` | Maintenance tasks (deps, tooling, etc.) that don't modify src or tests |
+| `revert` | Reverts a previous commit |
 
 Examples:
 
