@@ -204,6 +204,7 @@ function renderChangelog(markdown: string): string {
       closeRelease()
       const headingText = line.slice(3)
       const releaseMatch =
+        headingText.match(/^\[(.+?)\]\([^)]*\)\s+\((.+?)\)$/) ??
         headingText.match(/^\[(.+?)\]\s*-\s*(.+)$/) ??
         headingText.match(/^([^\s([]+)\s+\((.+?)\)$/)
       if (releaseMatch) {
