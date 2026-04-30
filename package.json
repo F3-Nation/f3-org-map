@@ -33,7 +33,7 @@
   },
   "dependencies": {
     "@turf/area": "^7.3.3",
-    "@turf/helpers": "^7.3.3",
+    "@turf/helpers": "^7.3.5",
     "leaflet": "^1.9.4"
   }
 }
