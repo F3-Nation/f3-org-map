@@ -154,6 +154,7 @@ function renderInlineMarkdown(value: string): string {
   return escapeHtml(value)
     .replace(/`([^`]+)`/g, '<code>$1</code>')
     .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
 }
 
 function renderChangelog(markdown: string): string {
@@ -202,7 +203,9 @@ function renderChangelog(markdown: string): string {
     if (line.startsWith('## ')) {
       closeRelease()
       const headingText = line.slice(3)
-      const releaseMatch = headingText.match(/^\[(.+?)\]\s*-\s*(.+)$/)
+      const releaseMatch =
+        headingText.match(/^\[(.+?)\]\s*-\s*(.+)$/) ??
+        headingText.match(/^([^\s([]+)\s+\((.+?)\)$/)
       if (releaseMatch) {
         const [, version, date] = releaseMatch
         parts.push(
@@ -222,9 +225,9 @@ function renderChangelog(markdown: string): string {
       continue
     }
 
-    if (line.startsWith('- ')) {
+    if (line.startsWith('- ') || line.startsWith('* ')) {
       flushParagraph()
-      listItems.push(line.slice(2))
+      listItems.push(line.slice(2).replace(/\s*\(\[[a-f0-9]{7,40}\]\([^)]+\)\)/g, ''))
       continue
     }
 
