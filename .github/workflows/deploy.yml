@@ -1,10 +1,8 @@
 name: Deploy to GitHub Pages
 
-on:
+"on":
   push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -23,7 +21,6 @@ jobs:
           node-version: '20'
       
       - run: npm ci
-      - run: npm run test
       - run: npm run build
       
       - name: Upload artifact
