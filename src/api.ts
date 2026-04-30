@@ -7,12 +7,14 @@ const API_BASE = import.meta.env.VITE_API_BASE || 'https://api.f3nation.com/v1';
 
 export async function apiGet<T>(path: string, params?: Record<string, string | number | boolean | Array<string | number>>): Promise<T> {
   // Remove leading /v1 if present to avoid double /v1/v1
-  let cleanPath = path.replace(/^\/v1\/?/, '/');
+  const cleanPath = path.replace(/^\/v1\/?/, '/');
   const url = API_BASE ? new URL(`${API_BASE}${cleanPath}`) : new URL(cleanPath, window.location.origin);
   if (params) {
     Object.entries(params).forEach(([key, value]) => {
       if (Array.isArray(value)) {
-        value.forEach((item, index) => url.searchParams.append(`${key}[${index}]`, String(item)));
+        value.forEach((item, index) => {
+          url.searchParams.append(`${key}[${index}]`, String(item));
+        });
       } else {
         url.searchParams.set(key, String(value));
       }

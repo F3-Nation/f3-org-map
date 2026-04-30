@@ -3,6 +3,7 @@ import { defineConfig, loadEnv } from 'vite'
 export default defineConfig(({ mode }) => {
   // Load env file based on mode
   const env = loadEnv(mode, process.cwd(), '');
+  const appVersion = process.env.npm_package_version ?? '0.0.0';
   return {
     base: './',
     server: {
@@ -13,7 +14,8 @@ export default defineConfig(({ mode }) => {
       }
     },
     define: {
-      'import.meta.env.VITE_API_BASE': JSON.stringify(env.VITE_API_BASE)
+      'import.meta.env.VITE_API_BASE': JSON.stringify(env.VITE_API_BASE),
+      __APP_VERSION__: JSON.stringify(appVersion)
     }
   }
 })

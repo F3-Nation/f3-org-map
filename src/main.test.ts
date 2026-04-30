@@ -1,73 +1,118 @@
-import { describe, it, expect, vi } from 'vitest'
-// Mock import.meta.env for api.ts
-Object.defineProperty(globalThis, 'import', {
-  value: { meta: { env: { VITE_API_BASE: 'https://api.f3nation.com/v1' } } },
-  configurable: true
-});
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { apiGet } from './api'
-import { fuzzyScore, convexHull } from './utils'
-import { updateUrlState, restoreStateFromUrl } from './state'
+import type { Org } from './orgChart'
+import { currentLevelIndex, restoreStateFromUrl, selectedPath, setCurrentLevelIndex, updateUrlState } from './state'
+import { convexHull, fuzzyScore } from './utils'
 
-// --- API Integration Test ---
 describe('apiGet', () => {
-  it('constructs correct URL and handles params', async () => {
+  beforeEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('constructs URL, params, and headers', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ result: 'ok' })
+      json: async () => ({ ok: true })
     })
-    globalThis.fetch = fetchMock as any
-    const result = await apiGet('/test', { foo: 'bar', arr: [1, 2] })
-    expect(fetchMock).toHaveBeenCalled()
-    expect(result).toEqual({ result: 'ok' })
-    const url = new URL(fetchMock.mock.calls[0][0])
-    expect(url.pathname.endsWith('/test')).toBe(true)
-    expect(url.searchParams.get('foo')).toBe('bar')
-    expect(url.searchParams.get('arr[0]')).toBe('1')
-    expect(url.searchParams.get('arr[1]')).toBe('2')
+    vi.stubGlobal('fetch', fetchMock)
+
+    const data = await apiGet('/v1/org-chart', {
+      q: 'carolina',
+      active: true,
+      ids: [1, 2]
+    })
+
+    expect(data).toEqual({ ok: true })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    const [rawUrl, requestInit] = fetchMock.mock.calls[0]
+    const requestUrl = new URL(rawUrl)
+
+    expect(requestUrl.pathname.endsWith('/org-chart')).toBe(true)
+    expect(requestUrl.searchParams.get('q')).toBe('carolina')
+    expect(requestUrl.searchParams.get('active')).toBe('true')
+    expect(requestUrl.searchParams.get('ids[0]')).toBe('1')
+    expect(requestUrl.searchParams.get('ids[1]')).toBe('2')
+    expect(requestInit.headers).toMatchObject({
+      Authorization: 'Bearer f3-org-map',
+      client: 'https://org.f3nation.com'
+    })
   })
 
-  it('throws on non-ok response', async () => {
+  it('throws for non-ok responses', async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 500, statusText: 'Error' })
-    globalThis.fetch = fetchMock as any
-    await expect(apiGet('/fail')).rejects.toThrow('API request failed')
+    vi.stubGlobal('fetch', fetchMock)
+    await expect(apiGet('/fail')).rejects.toThrow('API request failed: 500 Error')
   })
 })
 
-// --- UI Logic ---
 describe('fuzzyScore', () => {
+  it('returns null for empty query', () => {
+    expect(fuzzyScore('   ', 'charlotte')).toBeNull()
+  })
+
   it('is case-insensitive', () => {
-    expect(fuzzyScore('FOO', 'foo')).toBe(fuzzyScore('foo', 'FOO'))
+    expect(fuzzyScore('REG', 'region')).toBe(fuzzyScore('reg', 'REGION'))
+  })
+
+  it('returns null when query characters are not matched in order', () => {
+    expect(fuzzyScore('sct', 'south carolina')).toBeNull()
   })
 })
 
-// --- Map Logic ---
 describe('convexHull', () => {
-  it('returns correct hull for square', () => {
-    const points = [
+  it('returns a four-corner hull for a square with an interior point', () => {
+    const hull = convexHull([
       { lat: 0, lng: 0 },
       { lat: 1, lng: 0 },
       { lat: 1, lng: 1 },
-      { lat: 0, lng: 1 }
-    ]
-    const hull = convexHull(points)
-    expect(hull.length).toBe(4)
+      { lat: 0, lng: 1 },
+      { lat: 0.5, lng: 0.5 }
+    ])
+
+    expect(hull).toHaveLength(4)
   })
-  it('returns input for <3 points', () => {
-    expect(convexHull([{ lat: 1, lng: 2 }])).toEqual([{ lat: 1, lng: 2 }])
+
+  it('returns the same array for one point', () => {
+    const points = [{ lat: 35.2, lng: -80.8 }]
+    expect(convexHull(points)).toEqual(points)
   })
 })
 
-// --- State Management ---
-import { selectedPath, setCurrentLevelIndex } from './state'
-describe('updateUrlState/restoreStateFromUrl', () => {
-  it('sets and restores org and level params', () => {
-    (selectedPath as any).length = 0; // clear array
-    selectedPath.push({ id: 42, name: 'Test Org', orgType: 'region' })
+describe('URL state helpers', () => {
+  const nation: Org = { id: 1, name: 'Nation', orgType: 'nation', parentId: null }
+  const sector: Org = { id: 10, name: 'Mid Atlantic', orgType: 'sector', parentId: 1 }
+  const area: Org = { id: 20, name: 'Carolinas', orgType: 'area', parentId: 10 }
+  const region: Org = { id: 30, name: 'Charlotte Metro', orgType: 'region', parentId: 20 }
+
+  beforeEach(() => {
+    selectedPath.length = 0
+    setCurrentLevelIndex(0)
+    window.history.replaceState(null, '', '/')
+  })
+
+  it('writes level and org query params', () => {
+    selectedPath.push(sector, area)
     setCurrentLevelIndex(2)
+
     updateUrlState()
-    expect(window.location.search).toContain('org=42')
-    // Now test restore
-    restoreStateFromUrl()
-    // Would need to check selectedPath/currentLevelIndex updated
+
+    expect(window.location.search).toContain('level=2')
+    expect(window.location.search).toContain('org=20')
+  })
+
+  it('restores selected path from a region deep-link up to area', () => {
+    window.history.replaceState(null, '', '/?org=30&level=2')
+    const orgById = new Map<number, Org>([
+      [1, nation],
+      [10, sector],
+      [20, area],
+      [30, region]
+    ])
+
+    restoreStateFromUrl(orgById)
+
+    expect(currentLevelIndex).toBe(2)
+    expect(selectedPath.map((org) => org.id)).toEqual([10, 20])
   })
 })

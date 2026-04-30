@@ -71,6 +71,72 @@ npm run test
 ```
 Tests are written with [Vitest](https://vitest.dev/).
 
+### Lint and Format
+
+```sh
+npm run lint
+npm run format
+```
+
+Linting and formatting are powered by Biome.
+
+---
+
+## Repository Automation
+
+- Lefthook runs checks locally on `pre-commit` and validates commit messages on `commit-msg`.
+- Commitlint enforces Conventional Commits (requirements below).
+- Dependabot opens weekly updates for npm packages and GitHub Actions.
+- Release Please creates/updates a release PR and updates `CHANGELOG.md`.
+- The app header shows the current version and links to the changelog.
+
+### Commitlint Requirements
+
+Commit messages must follow Conventional Commits:
+
+- `feat:` for new user-facing functionality
+- `fix:` for bug fixes
+- `chore:` for maintenance (deps, tooling, docs, etc.)
+- `docs:` for documentation-only changes
+- `refactor:` for internal code improvements without behavior change
+- `test:` for test-only changes
+
+Examples:
+
+```text
+feat: add region deep-link support
+fix: handle missing org points in map rendering
+chore: update vite and vitest
+docs: document release workflow
+```
+
+Breaking changes should use `!` or a `BREAKING CHANGE:` footer:
+
+```text
+feat!: remove legacy org endpoint
+```
+
+### Release Please Workflow
+
+- Runs on push to `main`.
+- Uses Conventional Commit history to determine semantic version bump.
+- Opens or updates a release PR with version/changelog updates.
+- This repo is configured to only manage release PR/changelog flow and not publish GitHub Releases.
+
+Version bump rules:
+
+- Patch bump: `fix:` commits
+- Minor bump: `feat:` commits
+- Major bump: any breaking change, typically `feat!:` / `fix!:` / `refactor!:` or a commit with a `BREAKING CHANGE:` footer
+
+Examples:
+
+```text
+fix: correct map sizing on tall sidebars        -> patch bump
+feat: add in-app changelog modal                -> minor bump
+feat!: remove legacy org route                  -> major bump
+```
+
 ---
 
 ## Deployment

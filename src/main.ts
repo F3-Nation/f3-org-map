@@ -1,4 +1,5 @@
 import './style.css'
+import changelogMarkdown from '../CHANGELOG.md?raw'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import turfArea from '@turf/area'
@@ -15,6 +16,8 @@ import {
 import { apiGet } from './api'
 import { fuzzyScore, convexHull } from './utils'
 import { updateUrlState, restoreStateFromUrl, levelOrder, currentLevelIndex, selectedPath, setCurrentLevelIndex } from './state'
+
+declare const __APP_VERSION__: string
 
 type OrgPosition = {
   title?: string
@@ -68,6 +71,14 @@ app.innerHTML = `
           <div class="map-loading-spinner" aria-hidden="true"></div>
           <div class="map-loading-text">Loading map data...</div>
         </div>
+        <button
+          class="map-version"
+          id="map-version"
+          type="button"
+          aria-haspopup="dialog"
+          aria-controls="changelog-dialog"
+          title="View version history"
+        >v${__APP_VERSION__}</button>
       </section>
       <div class="sidebar">
         <div class="search" id="search">
@@ -88,6 +99,19 @@ app.innerHTML = `
         </aside>
       </div>
     </main>
+    <div class="changelog-modal is-hidden" id="changelog-modal" aria-hidden="true">
+      <div class="changelog-backdrop" id="changelog-backdrop"></div>
+      <section class="changelog-panel" id="changelog-dialog" role="dialog" aria-modal="true" aria-labelledby="changelog-title">
+        <div class="changelog-header">
+          <div>
+            <div class="changelog-eyebrow">Version History</div>
+            <h2 class="changelog-title" id="changelog-title">F3 Geographic Directory</h2>
+          </div>
+          <button class="changelog-close" id="changelog-close" type="button" aria-label="Close changelog">Close</button>
+        </div>
+        <div class="changelog-content" id="changelog-content"></div>
+      </section>
+    </div>
   </div>
 `
 
@@ -108,9 +132,137 @@ const infoPanel = document.querySelector<HTMLDivElement>('#info')!
 const breadcrumbEl = document.querySelector<HTMLDivElement>('#breadcrumb')!
 const layersContainer = document.querySelector<HTMLDivElement>('#layers')!
 const mapLoadingEl = document.querySelector<HTMLDivElement>('#map-loading')!
+const mapVersionButton = document.querySelector<HTMLButtonElement>('#map-version')!
 const searchInput = document.querySelector<HTMLInputElement>('#org-search')!
 const searchResults = document.querySelector<HTMLDivElement>('#search-results')!
 const searchContainer = document.querySelector<HTMLDivElement>('#search')!
+const changelogModal = document.querySelector<HTMLDivElement>('#changelog-modal')!
+const changelogBackdrop = document.querySelector<HTMLDivElement>('#changelog-backdrop')!
+const changelogCloseButton = document.querySelector<HTMLButtonElement>('#changelog-close')!
+const changelogContent = document.querySelector<HTMLDivElement>('#changelog-content')!
+
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;')
+}
+
+function renderInlineMarkdown(value: string): string {
+  return escapeHtml(value)
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+}
+
+function renderChangelog(markdown: string): string {
+  const lines = markdown.split(/\r?\n/)
+  const parts: string[] = []
+  let paragraph: string[] = []
+  let listItems: string[] = []
+  let releaseOpen = false
+
+  const flushParagraph = () => {
+    if (paragraph.length === 0) return
+    parts.push(`<p>${renderInlineMarkdown(paragraph.join(' '))}</p>`)
+    paragraph = []
+  }
+
+  const flushList = () => {
+    if (listItems.length === 0) return
+    parts.push(`<ul>${listItems.map((item) => `<li>${renderInlineMarkdown(item)}</li>`).join('')}</ul>`)
+    listItems = []
+  }
+
+  const closeRelease = () => {
+    if (!releaseOpen) return
+    flushParagraph()
+    flushList()
+    parts.push('</section>')
+    releaseOpen = false
+  }
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim()
+
+    if (!line) {
+      flushParagraph()
+      flushList()
+      continue
+    }
+
+    if (line.startsWith('# ')) {
+      flushParagraph()
+      flushList()
+      parts.push(`<h1>${renderInlineMarkdown(line.slice(2))}</h1>`)
+      continue
+    }
+
+    if (line.startsWith('## ')) {
+      closeRelease()
+      const headingText = line.slice(3)
+      const releaseMatch = headingText.match(/^\[(.+?)\]\s*-\s*(.+)$/)
+      if (releaseMatch) {
+        const [, version, date] = releaseMatch
+        parts.push(
+          `<section class="changelog-release"><div class="changelog-release-header"><h2>${renderInlineMarkdown(version)}</h2><span class="changelog-release-date">${renderInlineMarkdown(date)}</span></div>`
+        )
+        releaseOpen = true
+      } else {
+        parts.push(`<h2>${renderInlineMarkdown(headingText)}</h2>`)
+      }
+      continue
+    }
+
+    if (line.startsWith('### ')) {
+      flushParagraph()
+      flushList()
+      parts.push(`<h3>${renderInlineMarkdown(line.slice(4))}</h3>`)
+      continue
+    }
+
+    if (line.startsWith('- ')) {
+      flushParagraph()
+      listItems.push(line.slice(2))
+      continue
+    }
+
+    paragraph.push(line)
+  }
+
+  closeRelease()
+  flushParagraph()
+  flushList()
+
+  return parts.join('')
+}
+
+function openChangelog() {
+  changelogModal.classList.remove('is-hidden')
+  changelogModal.setAttribute('aria-hidden', 'false')
+  changelogCloseButton.focus()
+}
+
+function closeChangelog() {
+  changelogModal.classList.add('is-hidden')
+  changelogModal.setAttribute('aria-hidden', 'true')
+  mapVersionButton.focus()
+}
+
+changelogContent.innerHTML = renderChangelog(changelogMarkdown)
+
+mapVersionButton.addEventListener('click', () => {
+  openChangelog()
+})
+
+changelogCloseButton.addEventListener('click', () => {
+  closeChangelog()
+})
+
+changelogBackdrop.addEventListener('click', () => {
+  closeChangelog()
+})
 
 function setMapLoading(isLoading: boolean, message: string = 'Loading map data...') {
   if (!mapLoadingEl) return
@@ -125,11 +277,13 @@ function setMapLoading(isLoading: boolean, message: string = 'Loading map data..
 // Handle layer button clicks
 layersContainer.querySelectorAll('.layer-btn').forEach((btn) => {
   btn.addEventListener('click', () => {
-    const level = parseInt((btn as HTMLElement).dataset.level!)
+    const level = parseInt((btn as HTMLElement).dataset.level!, 10)
     selectedPath.length = 0
     setCurrentLevelIndex(level)
     // Update active button styling
-    layersContainer.querySelectorAll('.layer-btn').forEach((b) => b.classList.remove('layer-active'))
+    layersContainer.querySelectorAll('.layer-btn').forEach((b) => {
+      b.classList.remove('layer-active')
+    })
     btn.classList.add('layer-active')
     updateUrlState()
     renderLevel()
@@ -296,6 +450,10 @@ searchInput.addEventListener('keydown', (event) => {
     }
   }
   if (event.key === 'Escape') {
+    if (!changelogModal.classList.contains('is-hidden')) {
+      closeChangelog()
+      return
+    }
     clearSearchResults()
     searchInput.blur()
   }
@@ -669,7 +827,7 @@ function renderBreadcrumb() {
   // Add click handlers to all clickable breadcrumbs
   // All breadcrumbs are clickable except the last one (unless it's Nation)
   breadcrumbEl.querySelectorAll('.breadcrumb-crumb').forEach((crumb) => {
-    const depth = parseInt((crumb as HTMLElement).dataset.depth!);
+    const depth = parseInt((crumb as HTMLElement).dataset.depth!, 10);
     crumb.addEventListener('click', () => {
       if (depth === -1) {
         // Clicking Nation: show sectors on map but Nation info in sidebar
@@ -696,7 +854,9 @@ function renderLevel(focusBounds?: L.LatLngBounds) {
   renderBreadcrumb()
   
   // Update active layer button
-  layersContainer.querySelectorAll('.layer-btn').forEach((btn) => btn.classList.remove('layer-active'))
+  layersContainer.querySelectorAll('.layer-btn').forEach((btn) => {
+    btn.classList.remove('layer-active')
+  })
   const activeBtn = layersContainer.querySelector(`[data-level="${currentLevelIndex}"]`)
   if (activeBtn) activeBtn.classList.add('layer-active')
 
@@ -705,7 +865,7 @@ function renderLevel(focusBounds?: L.LatLngBounds) {
   const allLatLngs: L.LatLng[] = []
 
   orgs.forEach((org) => {
-    let latLngs: L.LatLng[] | undefined = undefined;
+    let latLngs: L.LatLng[] | undefined;
     // Special handling for International sector and General International Area - create star polygon in Atlantic
     if (isSectorInternational(org) || isGeneralInternationalArea(org)) {
       const atlanticCenter = { lat: 20, lng: -40 };

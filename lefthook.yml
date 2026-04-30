@@ -1,0 +1,12 @@
+pre-commit:
+  parallel: true
+  commands:
+    lint:
+      run: npm run lint
+    test:
+      run: npm run test:run -- --passWithNoTests
+
+commit-msg:
+  commands:
+    commitlint:
+      run: npx --no-install commitlint --edit {1}
