@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 This project follows Keep a Changelog and uses Semantic Versioning.
 
+## [1.0.1](https://github.com/F3-Nation/f3-org-map/compare/v1.0.0...v1.0.1) (2026-04-30)
+
+
+### Bug Fixes
+
+* formatted version history ([8605a9e](https://github.com/F3-Nation/f3-org-map/commit/8605a9e42dfa1580ae27896544009129f695e1f4))
+
 ## 1.0.0 (2026-04-30)
 
 
