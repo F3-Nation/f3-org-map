@@ -609,7 +609,7 @@ function renderInfo(org: Org, detail?: OrgInfo) {
           return `<li class="info-position">${avatarMarkup}<div><div class="info-role">${title}</div><div class="info-person">${name}</div></div></li>`
         })
         .join('')
-    : '<li class="info-empty">No roles listed.</li>'
+    : '<li class="info-empty">This organization has no admins. If you would like to take ownership of this organization, please fill out <a href="https://forms.gle/8AR4JCK3txSVr1Xy7" target="_blank" rel="noopener noreferrer">this form</a> and a Nation admin will get back to you.</li>'
 
   infoPanel.innerHTML = `
     <div class="info-title">${detail?.name ?? org.name}</div>
