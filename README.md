@@ -39,7 +39,7 @@ An interactive map application for visualizing F3 Nation's sectors, areas, regio
 
 The API base URL is set automatically:
 
-- **Local development**: Uses `http://localhost:3000/v1` (see proxy config in vite.config.ts)
+- **Local development**: Defaults to `https://api.f3nation.com/v1` unless `VITE_API_BASE` is set.
 - **Production (GitHub Pages, etc.)**: Uses `https://api.f3nation.com/v1`
 - You can override this by setting the `VITE_API_BASE` environment variable in a `.env` file:
   ```env

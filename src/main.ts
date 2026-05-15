@@ -19,6 +19,11 @@ import { updateUrlState, restoreStateFromUrl, levelOrder, currentLevelIndex, sel
 
 declare const __APP_VERSION__: string
 
+type AdminFlagsWindow = Window & {
+  __IS_ADMIN__?: boolean
+  __IS_DEBUG__?: boolean
+}
+
 type OrgPosition = {
   positionId?: number
   userId?: number
@@ -133,17 +138,31 @@ L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
 
 const layerGroup = L.layerGroup().addTo(map)
 const infoPanel = document.querySelector<HTMLDivElement>('#info')!
-infoPanel.addEventListener('click', (e) => {
-  const target = (e.target as HTMLElement).closest<HTMLElement>('[data-admin-log]')
-  if (!target) return
-  const raw = target.dataset.adminLog
-  if (!raw) return
-  try {
-    console.log('[admin]', JSON.parse(raw))
-  } catch {
-    console.log('[admin]', raw)
-  }
-})
+
+function isAdminUser(): boolean {
+  const flags = window as AdminFlagsWindow
+  return flags.__IS_ADMIN__ === true || flags.__IS_DEBUG__ === true
+}
+
+const showAdminDebug = isAdminUser()
+
+function encodeAdminLog(payload: unknown): string {
+  return encodeURIComponent(JSON.stringify(payload))
+}
+
+if (showAdminDebug) {
+  infoPanel.addEventListener('click', (e) => {
+    const target = (e.target as HTMLElement).closest<HTMLElement>('[data-admin-log]')
+    if (!target) return
+    const raw = target.dataset.adminLog
+    if (!raw) return
+    try {
+      console.log('[admin]', JSON.parse(decodeURIComponent(raw)))
+    } catch {
+      console.log('[admin]', raw)
+    }
+  })
+}
 const breadcrumbEl = document.querySelector<HTMLDivElement>('#breadcrumb')!
 const layersContainer = document.querySelector<HTMLDivElement>('#layers')!
 const mapLoadingEl = document.querySelector<HTMLDivElement>('#map-loading')!
@@ -609,8 +628,10 @@ function renderInfo(org: Org, detail?: OrgInfo) {
           const name = pos.f3Name ?? 'Unknown'
           const avatar = pos.avatarUrl ?? UNKNOWN_AVATAR_SVG
           const avatarMarkup = `<img src="${avatar}" alt="${name}" class="info-avatar" loading="lazy" />`
-          const log = JSON.stringify({ positionId: pos.positionId, userId: pos.userId, f3Name: name })
-          return `<li class="info-position" data-admin-log='${log}'>${avatarMarkup}<div><div class="info-role">${title}</div><div class="info-person">${name}</div></div></li>`
+          const adminLogAttr = showAdminDebug
+            ? ` data-admin-log="${encodeAdminLog({ positionId: pos.positionId, userId: pos.userId, f3Name: name })}"`
+            : ''
+          return `<li class="info-position"${adminLogAttr}>${avatarMarkup}<div><div class="info-role">${title}</div><div class="info-person">${name}</div></div></li>`
         })
         .join('')
     : '<li class="info-empty">No positions listed.</li>'
@@ -622,14 +643,20 @@ function renderInfo(org: Org, detail?: OrgInfo) {
           const name = role.f3Name ?? 'Unknown'
           const avatar = role.avatarUrl ?? UNKNOWN_AVATAR_SVG
           const avatarMarkup = `<img src="${avatar}" alt="${name}" class="info-avatar" loading="lazy" />`
-          const log = JSON.stringify({ roleId: role.roleId, userId: role.userId, f3Name: name })
-          return `<li class="info-position" data-admin-log='${log}'>${avatarMarkup}<div><div class="info-role">${title}</div><div class="info-person">${name}</div></div></li>`
+          const adminLogAttr = showAdminDebug
+            ? ` data-admin-log="${encodeAdminLog({ roleId: role.roleId, userId: role.userId, f3Name: name })}"`
+            : ''
+          return `<li class="info-position"${adminLogAttr}>${avatarMarkup}<div><div class="info-role">${title}</div><div class="info-person">${name}</div></div></li>`
         })
         .join('')
     : '<li class="info-empty">No roles listed.</li>'
 
+  const orgAdminLogAttr = showAdminDebug
+    ? ` data-admin-log="${encodeAdminLog({ orgId: detail?.id ?? org.id, name: detail?.name ?? org.name, orgType: detail?.orgType ?? org.orgType })}"`
+    : ''
+
   infoPanel.innerHTML = `
-    <div class="info-title" data-admin-log='${JSON.stringify({ orgId: detail?.id ?? org.id, name: detail?.name ?? org.name, orgType: detail?.orgType ?? org.orgType })}'>${detail?.name ?? org.name}</div>
+    <div class="info-title"${orgAdminLogAttr}>${detail?.name ?? org.name}</div>
     <div class="info-subtitle">${(detail?.orgType ?? org.orgType).toUpperCase()}</div>
     <div class="info-section">
       <div class="info-label">Organization Email</div>
