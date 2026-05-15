@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 This project follows Keep a Changelog and uses Semantic Versioning.
 
+## [1.1.0](https://github.com/F3-Nation/f3-org-map/compare/v1.0.1...v1.1.0) (2026-05-15)
+
+
+### Features
+
+* added helper text when org is selected that has no admin or edi… ([1a57ecf](https://github.com/F3-Nation/f3-org-map/commit/1a57ecfacc7436872f861d30e5132988ac69b304))
+* added helper text when org is selected that has no admin or editor assigned. ([5f7c123](https://github.com/F3-Nation/f3-org-map/commit/5f7c123b1a3fedd698ec9f151418fd6fe41e5025))
+
 ## [1.0.1](https://github.com/F3-Nation/f3-org-map/compare/v1.0.0...v1.0.1) (2026-04-30)
 
 
