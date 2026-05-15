@@ -19,13 +19,22 @@ import { updateUrlState, restoreStateFromUrl, levelOrder, currentLevelIndex, sel
 
 declare const __APP_VERSION__: string
 
+type AdminFlagsWindow = Window & {
+  __IS_ADMIN__?: boolean
+  __IS_DEBUG__?: boolean
+}
+
 type OrgPosition = {
+  positionId?: number
+  userId?: number
   title?: string
   f3Name?: string
   avatarUrl?: string
 }
 
 type OrgRole = {
+  roleId?: number
+  userId?: number
   title?: string
   f3Name?: string
   avatarUrl?: string
@@ -129,6 +138,31 @@ L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
 
 const layerGroup = L.layerGroup().addTo(map)
 const infoPanel = document.querySelector<HTMLDivElement>('#info')!
+
+function isAdminUser(): boolean {
+  const flags = window as AdminFlagsWindow
+  return flags.__IS_ADMIN__ === true || flags.__IS_DEBUG__ === true
+}
+
+const showAdminDebug = isAdminUser()
+
+function encodeAdminLog(payload: unknown): string {
+  return encodeURIComponent(JSON.stringify(payload))
+}
+
+if (showAdminDebug) {
+  infoPanel.addEventListener('click', (e) => {
+    const target = (e.target as HTMLElement).closest<HTMLElement>('[data-admin-log]')
+    if (!target) return
+    const raw = target.dataset.adminLog
+    if (!raw) return
+    try {
+      console.log('[admin]', JSON.parse(decodeURIComponent(raw)))
+    } catch {
+      console.log('[admin]', raw)
+    }
+  })
+}
 const breadcrumbEl = document.querySelector<HTMLDivElement>('#breadcrumb')!
 const layersContainer = document.querySelector<HTMLDivElement>('#layers')!
 const mapLoadingEl = document.querySelector<HTMLDivElement>('#map-loading')!
@@ -561,7 +595,7 @@ function renderInfo(org: Org, detail?: OrgInfo) {
     }
   }
   const emailDisplay = detail?.email 
-    ? `<a href="mailto:${detail.email}" class="info-link">${detail.email}</a>`
+    ? `<a href="mailto:${encodeURIComponent(detail.email)}" class="info-link">${escapeHtml(detail.email)}</a>`
     : 'Not listed'
   
   const socialLinks: string[] = []
@@ -593,8 +627,14 @@ function renderInfo(org: Org, detail?: OrgInfo) {
           const title = pos.title ?? 'Leader'
           const name = pos.f3Name ?? 'Unknown'
           const avatar = pos.avatarUrl ?? UNKNOWN_AVATAR_SVG
-          const avatarMarkup = `<img src="${avatar}" alt="${name}" class="info-avatar" loading="lazy" />`
-          return `<li class="info-position">${avatarMarkup}<div><div class="info-role">${title}</div><div class="info-person">${name}</div></div></li>`
+          const safeTitle = escapeHtml(title)
+          const safeName = escapeHtml(name)
+          const safeAvatar = escapeHtml(avatar)
+          const avatarMarkup = `<img src="${safeAvatar}" alt="${safeName}" class="info-avatar" loading="lazy" />`
+          const adminLogAttr = showAdminDebug
+            ? ` data-admin-log="${encodeAdminLog({ positionId: pos.positionId, userId: pos.userId, f3Name: name })}"`
+            : ''
+          return `<li class="info-position"${adminLogAttr}>${avatarMarkup}<div><div class="info-role">${safeTitle}</div><div class="info-person">${safeName}</div></div></li>`
         })
         .join('')
     : '<li class="info-empty">No positions listed.</li>'
@@ -605,15 +645,27 @@ function renderInfo(org: Org, detail?: OrgInfo) {
           const title = role.title ?? 'Role'
           const name = role.f3Name ?? 'Unknown'
           const avatar = role.avatarUrl ?? UNKNOWN_AVATAR_SVG
-          const avatarMarkup = `<img src="${avatar}" alt="${name}" class="info-avatar" loading="lazy" />`
-          return `<li class="info-position">${avatarMarkup}<div><div class="info-role">${title}</div><div class="info-person">${name}</div></div></li>`
+          const safeTitle = escapeHtml(title)
+          const safeName = escapeHtml(name)
+          const safeAvatar = escapeHtml(avatar)
+          const avatarMarkup = `<img src="${safeAvatar}" alt="${safeName}" class="info-avatar" loading="lazy" />`
+          const adminLogAttr = showAdminDebug
+            ? ` data-admin-log="${encodeAdminLog({ roleId: role.roleId, userId: role.userId, f3Name: name })}"`
+            : ''
+          return `<li class="info-position"${adminLogAttr}>${avatarMarkup}<div><div class="info-role">${safeTitle}</div><div class="info-person">${safeName}</div></div></li>`
         })
         .join('')
     : '<li class="info-empty">This organization has no admins. If you would like to take ownership of this organization, please fill out <a href="https://forms.gle/8AR4JCK3txSVr1Xy7" target="_blank" rel="noopener noreferrer">this form</a> and a Nation admin will get back to you.</li>'
 
+  const displayName = escapeHtml(detail?.name ?? org.name)
+  const displayOrgType = escapeHtml((detail?.orgType ?? org.orgType).toUpperCase())
+  const orgAdminLogAttr = showAdminDebug
+    ? ` data-admin-log="${encodeAdminLog({ orgId: detail?.id ?? org.id, name: detail?.name ?? org.name, orgType: detail?.orgType ?? org.orgType })}"`
+    : ''
+
   infoPanel.innerHTML = `
-    <div class="info-title">${detail?.name ?? org.name}</div>
-    <div class="info-subtitle">${(detail?.orgType ?? org.orgType).toUpperCase()}</div>
+    <div class="info-title"${orgAdminLogAttr}>${displayName}</div>
+    <div class="info-subtitle">${displayOrgType}</div>
     <div class="info-section">
       <div class="info-label">Organization Email</div>
       <div class="info-value">${emailDisplay}</div>
@@ -654,16 +706,18 @@ function renderInfo(org: Org, detail?: OrgInfo) {
 }
 
 function renderPlaceholder(message: string) {
+  const safeMessage = escapeHtml(message)
   infoPanel.innerHTML = `
-    <div class="info-title">${message}</div>
+    <div class="info-title">${safeMessage}</div>
     <div class="info-body"></div>
   `
 }
 
 function renderLoadingInfo(org: Org) {
+  const safeName = escapeHtml(org.name)
   infoPanel.innerHTML = `
-    <div class="info-title">${org.name}</div>
-    <div class="info-body">Loadings...</div>
+    <div class="info-title">${safeName}</div>
+    <div class="info-body">Loading ...</div>
   `
 }
 
