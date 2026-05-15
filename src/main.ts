@@ -717,7 +717,7 @@ function renderLoadingInfo(org: Org) {
   const safeName = escapeHtml(org.name)
   infoPanel.innerHTML = `
     <div class="info-title">${safeName}</div>
-    <div class="info-body">Loadings...</div>
+    <div class="info-body">Loading ...</div>
   `
 }
 
