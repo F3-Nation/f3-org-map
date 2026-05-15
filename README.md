@@ -174,7 +174,7 @@ This project is ready for static hosting (e.g., GitHub Pages, Netlify, Vercel).
 
 ## Troubleshooting
 
-- **API errors locally**: Make sure your backend is running at `localhost:3000` and supports the `/v1/org-chart` endpoint.
+- **API errors locally**: By default, local development uses `https://api.f3nation.com/v1`. To target a local backend, set `VITE_API_BASE` (for example `http://localhost:3000/v1`) in your `.env` file.
 - **Module not found errors**: Run `npm install` to ensure all dependencies are installed.
 - **Type errors for Vitest**: Ensure `vitest` is installed as a dev dependency.
 
