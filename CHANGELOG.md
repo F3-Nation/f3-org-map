@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 This project follows Keep a Changelog and uses Semantic Versioning.
 
+## [1.2.0](https://github.com/F3-Nation/f3-org-map/compare/v1.1.0...v1.2.0) (2026-05-15)
+
+
+### Features
+
+* logs user or org id to console when org name or user is clicked ([11635ad](https://github.com/F3-Nation/f3-org-map/commit/11635adf1b109dd2b1e604f838387842fca8f154))
+* logs users or org id to console when org name or user is clicked ([11635ad](https://github.com/F3-Nation/f3-org-map/commit/11635adf1b109dd2b1e604f838387842fca8f154))
+* switching to tag-based deployments ([709a7d4](https://github.com/F3-Nation/f3-org-map/commit/709a7d474e756079dd4575230e4cd9cb7dceb1fc))
+
+
+### Bug Fixes
+
+* coderabbit reviews ([28a6afc](https://github.com/F3-Nation/f3-org-map/commit/28a6afc6f26e8449e9b9505b2c5969e070693f92))
+* more coderabbit reviews ([0c05afb](https://github.com/F3-Nation/f3-org-map/commit/0c05afbfafe973bc6e9d9d1c29eab1c95a577cf5))
+* typo ([aebf4bf](https://github.com/F3-Nation/f3-org-map/commit/aebf4bf0cc32d460f9d8c1e1b37f58fceab7a4de))
+
 ## [1.1.0](https://github.com/F3-Nation/f3-org-map/compare/v1.0.1...v1.1.0) (2026-05-15)
 
 
