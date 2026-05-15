@@ -128,7 +128,8 @@ feat!: remove legacy org endpoint
 - Runs on push to `main`.
 - Uses Conventional Commit history to determine semantic version bump.
 - Opens or updates a release PR with version/changelog updates.
-- This repo is configured to only manage release PR/changelog flow and not publish GitHub Releases.
+- When the release PR is merged, it creates a Git tag and GitHub Release.
+- GitHub Pages deployment is triggered from that release tag (one deploy per release).
 
 Version bump rules:
 
@@ -152,9 +153,12 @@ This project is ready for static hosting (e.g., GitHub Pages, Netlify, Vercel).
 
 ### Deploy to GitHub Pages
 
-1. Push to the `main` branch.
-2. GitHub Actions workflow in `.github/workflows/deploy.yml` will build and deploy to Pages automatically.
-3. Ensure the `base` option in `vite.config.ts` is set to `'./'` for correct asset paths.
+1. Merge regular work into `main`.
+2. Release Please opens/updates a release PR.
+3. Merge the release PR to create a Git tag and GitHub Release.
+4. The release workflow builds and deploys GitHub Pages from that tag.
+5. Optional: run `.github/workflows/deploy.yml` manually to redeploy current code.
+6. Ensure the `base` option in `vite.config.ts` is set to `'./'` for correct asset paths.
 
 ---
 
