@@ -20,13 +20,13 @@
     "@commitlint/cli": "^21.0.1",
     "@commitlint/config-conventional": "^21.0.1",
     "@types/leaflet": "^1.9.21",
-    "@types/node": "^25.7.0",
+    "@types/node": "^25.9.1",
     "jsdom": "^29.1.1",
-    "lefthook": "^2.1.6",
-    "tsx": "^4.20.2",
+    "lefthook": "^2.1.8",
+    "tsx": "^4.22.3",
     "typescript": "~6.0.3",
     "vite": "npm:rolldown-vite@7.2.5",
-    "vitest": "^4.1.6"
+    "vitest": "^4.1.7"
   },
   "overrides": {
     "vite": "npm:rolldown-vite@7.2.5"
