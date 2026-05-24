@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 This project follows Keep a Changelog and uses Semantic Versioning.
 
+## [1.2.1](https://github.com/F3-Nation/f3-org-map/compare/v1.2.0...v1.2.1) (2026-05-24)
+
+
+### Bug Fixes
+
+* id to console was gated by weird admin check ([#29](https://github.com/F3-Nation/f3-org-map/issues/29)) ([f22ff94](https://github.com/F3-Nation/f3-org-map/commit/f22ff940a4a6ba82df8fd81a42f25392b2485b13))
+
 ## [1.2.0](https://github.com/F3-Nation/f3-org-map/compare/v1.1.0...v1.2.0) (2026-05-15)
 
 
