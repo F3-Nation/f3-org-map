@@ -19,11 +19,6 @@ import { updateUrlState, restoreStateFromUrl, levelOrder, currentLevelIndex, sel
 
 declare const __APP_VERSION__: string
 
-type AdminFlagsWindow = Window & {
-  __IS_ADMIN__?: boolean
-  __IS_DEBUG__?: boolean
-}
-
 type OrgPosition = {
   positionId?: number
   userId?: number
@@ -139,30 +134,21 @@ L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
 const layerGroup = L.layerGroup().addTo(map)
 const infoPanel = document.querySelector<HTMLDivElement>('#info')!
 
-function isAdminUser(): boolean {
-  const flags = window as AdminFlagsWindow
-  return flags.__IS_ADMIN__ === true || flags.__IS_DEBUG__ === true
-}
-
-const showAdminDebug = isAdminUser()
-
 function encodeAdminLog(payload: unknown): string {
   return encodeURIComponent(JSON.stringify(payload))
 }
 
-if (showAdminDebug) {
-  infoPanel.addEventListener('click', (e) => {
-    const target = (e.target as HTMLElement).closest<HTMLElement>('[data-admin-log]')
-    if (!target) return
-    const raw = target.dataset.adminLog
-    if (!raw) return
-    try {
-      console.log('[admin]', JSON.parse(decodeURIComponent(raw)))
-    } catch {
-      console.log('[admin]', raw)
-    }
-  })
-}
+infoPanel.addEventListener('click', (e) => {
+  const target = (e.target as HTMLElement).closest<HTMLElement>('[data-admin-log]')
+  if (!target) return
+  const raw = target.dataset.adminLog
+  if (!raw) return
+  try {
+    console.log('[admin]', JSON.parse(decodeURIComponent(raw)))
+  } catch {
+    console.log('[admin]', raw)
+  }
+})
 const breadcrumbEl = document.querySelector<HTMLDivElement>('#breadcrumb')!
 const layersContainer = document.querySelector<HTMLDivElement>('#layers')!
 const mapLoadingEl = document.querySelector<HTMLDivElement>('#map-loading')!
@@ -631,9 +617,7 @@ function renderInfo(org: Org, detail?: OrgInfo) {
           const safeName = escapeHtml(name)
           const safeAvatar = escapeHtml(avatar)
           const avatarMarkup = `<img src="${safeAvatar}" alt="${safeName}" class="info-avatar" loading="lazy" />`
-          const adminLogAttr = showAdminDebug
-            ? ` data-admin-log="${encodeAdminLog({ positionId: pos.positionId, userId: pos.userId, f3Name: name })}"`
-            : ''
+          const adminLogAttr = ` data-admin-log="${encodeAdminLog({ positionId: pos.positionId, userId: pos.userId, f3Name: name })}"`
           return `<li class="info-position"${adminLogAttr}>${avatarMarkup}<div><div class="info-role">${safeTitle}</div><div class="info-person">${safeName}</div></div></li>`
         })
         .join('')
@@ -649,9 +633,7 @@ function renderInfo(org: Org, detail?: OrgInfo) {
           const safeName = escapeHtml(name)
           const safeAvatar = escapeHtml(avatar)
           const avatarMarkup = `<img src="${safeAvatar}" alt="${safeName}" class="info-avatar" loading="lazy" />`
-          const adminLogAttr = showAdminDebug
-            ? ` data-admin-log="${encodeAdminLog({ roleId: role.roleId, userId: role.userId, f3Name: name })}"`
-            : ''
+          const adminLogAttr = ` data-admin-log="${encodeAdminLog({ roleId: role.roleId, userId: role.userId, f3Name: name })}"`
           return `<li class="info-position"${adminLogAttr}>${avatarMarkup}<div><div class="info-role">${safeTitle}</div><div class="info-person">${safeName}</div></div></li>`
         })
         .join('')
@@ -659,9 +641,7 @@ function renderInfo(org: Org, detail?: OrgInfo) {
 
   const displayName = escapeHtml(detail?.name ?? org.name)
   const displayOrgType = escapeHtml((detail?.orgType ?? org.orgType).toUpperCase())
-  const orgAdminLogAttr = showAdminDebug
-    ? ` data-admin-log="${encodeAdminLog({ orgId: detail?.id ?? org.id, name: detail?.name ?? org.name, orgType: detail?.orgType ?? org.orgType })}"`
-    : ''
+  const orgAdminLogAttr = ` data-admin-log="${encodeAdminLog({ orgId: detail?.id ?? org.id, name: detail?.name ?? org.name, orgType: detail?.orgType ?? org.orgType })}"`
 
   infoPanel.innerHTML = `
     <div class="info-title"${orgAdminLogAttr}>${displayName}</div>
