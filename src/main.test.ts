@@ -1,7 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { apiGet } from './api'
 import type { Org } from './orgChart'
-import { currentLevelIndex, restoreStateFromUrl, selectedPath, setCurrentLevelIndex, updateUrlState } from './state'
+import {
+  currentLevelIndex,
+  restoreStateFromUrl,
+  selectedPath,
+  setCurrentLevelIndex,
+  updateUrlState,
+} from './state'
 import { convexHull, fuzzyScore } from './utils'
 
 describe('apiGet', () => {
@@ -12,14 +18,14 @@ describe('apiGet', () => {
   it('constructs URL, params, and headers', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ ok: true })
+      json: async () => ({ ok: true }),
     })
     vi.stubGlobal('fetch', fetchMock)
 
     const data = await apiGet('/v1/org-chart', {
       q: 'carolina',
       active: true,
-      ids: [1, 2]
+      ids: [1, 2],
     })
 
     expect(data).toEqual({ ok: true })
@@ -35,7 +41,7 @@ describe('apiGet', () => {
     expect(requestUrl.searchParams.get('ids[1]')).toBe('2')
     expect(requestInit.headers).toMatchObject({
       Authorization: 'Bearer f3-org-map',
-      client: 'https://org.f3nation.com'
+      client: 'https://org.f3nation.com',
     })
   })
 
@@ -67,7 +73,7 @@ describe('convexHull', () => {
       { lat: 1, lng: 0 },
       { lat: 1, lng: 1 },
       { lat: 0, lng: 1 },
-      { lat: 0.5, lng: 0.5 }
+      { lat: 0.5, lng: 0.5 },
     ])
 
     expect(hull).toHaveLength(4)
@@ -107,7 +113,7 @@ describe('URL state helpers', () => {
       [1, nation],
       [10, sector],
       [20, area],
-      [30, region]
+      [30, region],
     ])
 
     restoreStateFromUrl(orgById)

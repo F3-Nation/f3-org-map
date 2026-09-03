@@ -2,9 +2,9 @@ import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
   test: {
-    environment: 'jsdom'
+    environment: 'jsdom',
   },
   define: {
-    'import.meta.env.VITE_API_BASE': JSON.stringify('https://api.f3nation.com/v1')
-  }
+    'import.meta.env.VITE_API_BASE': JSON.stringify('https://api.f3nation.com/v1'),
+  },
 })

@@ -37,7 +37,13 @@ export type Point = { lat: number; lng: number }
 export function normalizeOrgType(value: unknown, fallback: OrgType): OrgType {
   if (typeof value !== 'string') return fallback
   const normalized = value.trim().toLowerCase()
-  if (normalized === 'nation' || normalized === 'sector' || normalized === 'area' || normalized === 'region' || normalized === 'ao') {
+  if (
+    normalized === 'nation' ||
+    normalized === 'sector' ||
+    normalized === 'area' ||
+    normalized === 'region' ||
+    normalized === 'ao'
+  ) {
     return normalized as OrgType
   }
   return fallback
@@ -73,8 +79,13 @@ export function getOrgPointsFromItem(item: OrgChartItem): Point[] {
   }
 
   const record = item as Record<string, unknown>
-  const latCandidate = item.latitude ?? (record.lat as number | undefined) ?? (record.latitude as number | undefined)
-  const lngCandidate = item.longitude ?? (record.lng as number | undefined) ?? (record.lon as number | undefined) ?? (record.longitude as number | undefined)
+  const latCandidate =
+    item.latitude ?? (record.lat as number | undefined) ?? (record.latitude as number | undefined)
+  const lngCandidate =
+    item.longitude ??
+    (record.lng as number | undefined) ??
+    (record.lon as number | undefined) ??
+    (record.longitude as number | undefined)
   if (latCandidate != null && lngCandidate != null && isValidPoint(latCandidate, lngCandidate)) {
     points.push({ lat: latCandidate, lng: lngCandidate })
   }
@@ -101,7 +112,7 @@ export function buildOrgHierarchy(items: OrgChartItem[]): Org[] {
       id,
       name: name ?? (id === 1 ? 'Nation' : `Org ${id}`),
       orgType,
-      parentId: parentId ?? null
+      parentId: parentId ?? null,
     })
   }
 
