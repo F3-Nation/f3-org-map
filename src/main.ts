@@ -11,11 +11,18 @@ import {
   type Org,
   type OrgChartItem,
   type OrgType,
-  type Point
+  type Point,
 } from './orgChart'
 import { apiGet } from './api'
 import { fuzzyScore, convexHull } from './utils'
-import { updateUrlState, restoreStateFromUrl, levelOrder, currentLevelIndex, selectedPath, setCurrentLevelIndex } from './state'
+import {
+  updateUrlState,
+  restoreStateFromUrl,
+  levelOrder,
+  currentLevelIndex,
+  selectedPath,
+  setCurrentLevelIndex,
+} from './state'
 
 declare const __APP_VERSION__: string
 
@@ -122,14 +129,17 @@ app.innerHTML = `
 const map = L.map('map', {
   zoomControl: true,
   worldCopyJump: true,
-  minZoom: 2
+  minZoom: 2,
 }).setView([37.6, -96], 4)
 
-L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-  attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
-  subdomains: 'abcd',
-  maxZoom: 20
-}).addTo(map)
+L.tileLayer(
+  'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png?key=cb1_2nwg_1_400751470e58d29b4569f556',
+  {
+    attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+    subdomains: 'abcd',
+    maxZoom: 20,
+  },
+).addTo(map)
 
 const layerGroup = L.layerGroup().addTo(map)
 const infoPanel = document.querySelector<HTMLDivElement>('#info')!
@@ -174,7 +184,10 @@ function renderInlineMarkdown(value: string): string {
   return escapeHtml(value)
     .replace(/`([^`]+)`/g, '<code>$1</code>')
     .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
+    .replace(
+      /\[([^\]]+)\]\(([^)]+)\)/g,
+      '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>',
+    )
 }
 
 function renderChangelog(markdown: string): string {
@@ -192,7 +205,9 @@ function renderChangelog(markdown: string): string {
 
   const flushList = () => {
     if (listItems.length === 0) return
-    parts.push(`<ul>${listItems.map((item) => `<li>${renderInlineMarkdown(item)}</li>`).join('')}</ul>`)
+    parts.push(
+      `<ul>${listItems.map((item) => `<li>${renderInlineMarkdown(item)}</li>`).join('')}</ul>`,
+    )
     listItems = []
   }
 
@@ -230,7 +245,7 @@ function renderChangelog(markdown: string): string {
       if (releaseMatch) {
         const [, version, date] = releaseMatch
         parts.push(
-          `<section class="changelog-release"><div class="changelog-release-header"><h2>${renderInlineMarkdown(version)}</h2><span class="changelog-release-date">${renderInlineMarkdown(date)}</span></div>`
+          `<section class="changelog-release"><div class="changelog-release-header"><h2>${renderInlineMarkdown(version)}</h2><span class="changelog-release-date">${renderInlineMarkdown(date)}</span></div>`,
         )
         releaseOpen = true
       } else {
@@ -334,7 +349,7 @@ const UNKNOWN_AVATAR_SVG =
       '<rect width="80" height="80" rx="16" fill="#f1ead7"/>' +
       '<circle cx="40" cy="30" r="16" fill="#9ca3af"/>' +
       '<path d="M16 70c3-16 17-26 24-26s21 10 24 26" fill="#9ca3af"/>' +
-    '</svg>'
+      '</svg>',
   )
 
 function generateRandomColor(): string {
@@ -375,7 +390,7 @@ function getFocusBounds(org: Org): L.LatLngBounds | undefined {
     if (points.length === 2) {
       center = {
         lat: (points[0].lat + points[1].lat) / 2,
-        lng: (points[0].lng + points[1].lng) / 2
+        lng: (points[0].lng + points[1].lng) / 2,
       }
     }
     const circlePoints = createCircleBuffer(center, 0.6)
@@ -385,34 +400,36 @@ function getFocusBounds(org: Org): L.LatLngBounds | undefined {
 }
 
 function navigateToOrg(org: Org) {
-  const levelIndex = levelOrder.indexOf(org.orgType);
-  if (levelIndex === -1) return;
+  const levelIndex = levelOrder.indexOf(org.orgType)
+  if (levelIndex === -1) return
 
   if (org.orgType === 'sector') {
-    selectedPath.length = 0;
-    selectedPath.push(org);
-    setCurrentLevelIndex(1); // Switch to area layer
+    selectedPath.length = 0
+    selectedPath.push(org)
+    setCurrentLevelIndex(1) // Switch to area layer
   } else if (org.orgType === 'area') {
-    const path = getOrgPath(org).filter((item) => item.orgType !== 'nation');
-    selectedPath.length = 0;
-    selectedPath.push(...path);
-    setCurrentLevelIndex(2); // Switch to region layer
+    const path = getOrgPath(org).filter((item) => item.orgType !== 'nation')
+    selectedPath.length = 0
+    selectedPath.push(...path)
+    setCurrentLevelIndex(2) // Switch to region layer
   } else if (org.orgType === 'region') {
     // Only show up to area in breadcrumb, not region itself
-    const path = getOrgPath(org).filter((item) => item.orgType !== 'nation' && item.orgType !== 'region');
-    selectedPath.length = 0;
-    selectedPath.push(...path);
-    setCurrentLevelIndex(levelIndex);
+    const path = getOrgPath(org).filter(
+      (item) => item.orgType !== 'nation' && item.orgType !== 'region',
+    )
+    selectedPath.length = 0
+    selectedPath.push(...path)
+    setCurrentLevelIndex(levelIndex)
   } else {
-    const path = getOrgPath(org).filter((item) => item.orgType !== 'nation');
-    selectedPath.length = 0;
-    selectedPath.push(...path.slice(0, -1));
-    setCurrentLevelIndex(levelIndex);
+    const path = getOrgPath(org).filter((item) => item.orgType !== 'nation')
+    selectedPath.length = 0
+    selectedPath.push(...path.slice(0, -1))
+    setCurrentLevelIndex(levelIndex)
   }
 
-  updateUrlState();
-  renderLevel(getFocusBounds(org));
-  loadOrgInfo(org);
+  updateUrlState()
+  renderLevel(getFocusBounds(org))
+  loadOrgInfo(org)
 }
 
 function clearSearchResults() {
@@ -537,7 +554,7 @@ function formatNumber(value: number): string {
 function formatDecimal(value: number, fractionDigits = 1): string {
   return new Intl.NumberFormat('en-US', {
     minimumFractionDigits: 0,
-    maximumFractionDigits: fractionDigits
+    maximumFractionDigits: fractionDigits,
   }).format(value)
 }
 
@@ -580,32 +597,45 @@ function renderInfo(org: Org, detail?: OrgInfo) {
       }
     }
   }
-  const emailDisplay = detail?.email 
+  const emailDisplay = detail?.email
     ? `<a href="mailto:${encodeURIComponent(detail.email)}" class="info-link">${escapeHtml(detail.email)}</a>`
     : 'Not listed'
-  
+
   const socialLinks: string[] = []
-  const globeIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="info-icon" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"></path><path d="M2 12h20"></path></svg>'
-  const twitterIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="info-icon" aria-hidden="true"><path d="M22 4s-.7 2.1-2 3.4c1.6 10-9.4 17.3-18 11.6 2.2.1 4.4-.6 6-2C3 15.5.5 9.6 3 5c2.2 2.6 5.6 4.1 9 4-.9-4.2 4-6.6 7-3.8 1.1 0 3-1.2 3-1.2z"></path></svg>'
-  const facebookIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="info-icon" aria-hidden="true"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path></svg>'
-  const instagramIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="info-icon" aria-hidden="true"><rect width="20" height="20" x="2" y="2" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" x2="17.51" y1="6.5" y2="6.5"></line></svg>'
+  const globeIcon =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="info-icon" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"></path><path d="M2 12h20"></path></svg>'
+  const twitterIcon =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="info-icon" aria-hidden="true"><path d="M22 4s-.7 2.1-2 3.4c1.6 10-9.4 17.3-18 11.6 2.2.1 4.4-.6 6-2C3 15.5.5 9.6 3 5c2.2 2.6 5.6 4.1 9 4-.9-4.2 4-6.6 7-3.8 1.1 0 3-1.2 3-1.2z"></path></svg>'
+  const facebookIcon =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="info-icon" aria-hidden="true"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path></svg>'
+  const instagramIcon =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="info-icon" aria-hidden="true"><rect width="20" height="20" x="2" y="2" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" x2="17.51" y1="6.5" y2="6.5"></line></svg>'
 
   if (detail?.website) {
-    socialLinks.push(`<a href="${detail.website}" target="_blank" rel="noopener noreferrer" class="info-icon-link" title="Website" aria-label="Website">${globeIcon}</a>`)
+    socialLinks.push(
+      `<a href="${detail.website}" target="_blank" rel="noopener noreferrer" class="info-icon-link" title="Website" aria-label="Website">${globeIcon}</a>`,
+    )
   }
   if (detail?.twitter) {
-    socialLinks.push(`<a href="${detail.twitter}" target="_blank" rel="noopener noreferrer" class="info-icon-link" title="X (Twitter)" aria-label="X (Twitter)">${twitterIcon}</a>`)
+    socialLinks.push(
+      `<a href="${detail.twitter}" target="_blank" rel="noopener noreferrer" class="info-icon-link" title="X (Twitter)" aria-label="X (Twitter)">${twitterIcon}</a>`,
+    )
   }
   if (detail?.facebook) {
-    socialLinks.push(`<a href="${detail.facebook}" target="_blank" rel="noopener noreferrer" class="info-icon-link" title="Facebook" aria-label="Facebook">${facebookIcon}</a>`)
+    socialLinks.push(
+      `<a href="${detail.facebook}" target="_blank" rel="noopener noreferrer" class="info-icon-link" title="Facebook" aria-label="Facebook">${facebookIcon}</a>`,
+    )
   }
   if (detail?.instagram) {
-    socialLinks.push(`<a href="${detail.instagram}" target="_blank" rel="noopener noreferrer" class="info-icon-link" title="Instagram" aria-label="Instagram">${instagramIcon}</a>`)
+    socialLinks.push(
+      `<a href="${detail.instagram}" target="_blank" rel="noopener noreferrer" class="info-icon-link" title="Instagram" aria-label="Instagram">${instagramIcon}</a>`,
+    )
   }
-  
-  const socialMarkup = socialLinks.length > 0 
-    ? `<div class="info-section"><div class="info-label">Connect</div><div class="info-social">${socialLinks.join('')}</div></div>` 
-    : ''
+
+  const socialMarkup =
+    socialLinks.length > 0
+      ? `<div class="info-section"><div class="info-label">Connect</div><div class="info-social">${socialLinks.join('')}</div></div>`
+      : ''
 
   const positionMarkup = positions.length
     ? positions
@@ -789,11 +819,15 @@ async function loadOrgInfo(org: Org) {
   }
 }
 
-function createStarPolygon(center: { lat: number; lng: number }, radiusDegrees: number, points: number = 5): Point[] {
+function createStarPolygon(
+  center: { lat: number; lng: number },
+  radiusDegrees: number,
+  points: number = 5,
+): Point[] {
   const star: Point[] = []
   const outerRadius = radiusDegrees
   const innerRadius = radiusDegrees * 0.4
-  
+
   for (let i = 0; i < points * 2; i++) {
     const angle = (i * Math.PI) / points - Math.PI / 2
     const radius = i % 2 === 0 ? outerRadius : innerRadius
@@ -801,96 +835,104 @@ function createStarPolygon(center: { lat: number; lng: number }, radiusDegrees: 
     const lng = center.lng + radius * Math.sin(angle)
     star.push({ lat, lng })
   }
-  
+
   return star
 }
 
-function createCircleBuffer(center: { lat: number; lng: number }, radiusDegrees: number, segments: number = 8): Point[] {
+function createCircleBuffer(
+  center: { lat: number; lng: number },
+  radiusDegrees: number,
+  segments: number = 8,
+): Point[] {
   const circle: Point[] = []
-  
+
   for (let i = 0; i < segments; i++) {
     const angle = (i / segments) * 2 * Math.PI
     const lat = center.lat + radiusDegrees * Math.cos(angle)
     const lng = center.lng + radiusDegrees * Math.sin(angle)
     circle.push({ lat, lng })
   }
-  
+
   return circle
 }
 
 function getCurrentLevelOrgs(): Org[] {
-  const level = levelOrder[currentLevelIndex];
+  const level = levelOrder[currentLevelIndex]
 
   if (level === 'sector') {
-    return [...orgById.values()].filter((org) => org.orgType === 'sector');
+    return [...orgById.values()].filter((org) => org.orgType === 'sector')
   }
 
-  const parent = selectedPath[selectedPath.length - 1];
+  const parent = selectedPath[selectedPath.length - 1]
 
   // If no parent selected, show all orgs of this level (for layer button views)
   if (!parent) {
-    return [...orgById.values()].filter((org) => org.orgType === level);
+    return [...orgById.values()].filter((org) => org.orgType === level)
   }
 
   // Special handling for International: get all region descendants (not just direct children)
   if (isSectorInternational(parent) && level === 'region') {
-    const internationalDescendants = getDescendantOrgIds(parent.id);
-    return [...orgById.values()].filter((org) => org.orgType === 'region' && internationalDescendants.includes(org.id));
+    const internationalDescendants = getDescendantOrgIds(parent.id)
+    return [...orgById.values()].filter(
+      (org) => org.orgType === 'region' && internationalDescendants.includes(org.id),
+    )
   }
 
   // If at region level and selectedPath points to a region, show all sibling regions (same parent)
   if (level === 'region' && parent.orgType === 'region') {
-    const regionParentId = parent.parentId;
-    return [...orgById.values()].filter((org) => org.orgType === 'region' && org.parentId === regionParentId);
+    const regionParentId = parent.parentId
+    return [...orgById.values()].filter(
+      (org) => org.orgType === 'region' && org.parentId === regionParentId,
+    )
   }
 
-  return [...orgById.values()].filter((org) => org.orgType === level && org.parentId === parent.id);
+  return [...orgById.values()].filter((org) => org.orgType === level && org.parentId === parent.id)
 }
 
 function renderBreadcrumb() {
   const crumbs = [
     { label: 'Nation', depth: -1 },
-    ...selectedPath.map((org, idx) => ({ label: org.name, depth: idx }))
-  ];
+    ...selectedPath.map((org, idx) => ({ label: org.name, depth: idx })),
+  ]
   const crumbHtml = crumbs
     .map((crumb, idx) => {
-      const isLast = idx === crumbs.length - 1;
-      const isNation = crumb.depth === -1;
+      const isLast = idx === crumbs.length - 1
+      const isNation = crumb.depth === -1
       // Mark as non-clickable only if it's the last crumb AND not Nation
-      const isNonClickable = isLast && !isNation;
-      return `<span class="breadcrumb-crumb${isNonClickable ? ' breadcrumb-current' : ''}" data-depth="${crumb.depth}">${crumb.label}</span>`;
+      const isNonClickable = isLast && !isNation
+      return `<span class="breadcrumb-crumb${isNonClickable ? ' breadcrumb-current' : ''}" data-depth="${crumb.depth}">${crumb.label}</span>`
     })
-    .join(' <span class="breadcrumb-sep">/</span> ');
-  breadcrumbEl.innerHTML = crumbHtml;
+    .join(' <span class="breadcrumb-sep">/</span> ')
+  breadcrumbEl.innerHTML = crumbHtml
   // Add click handlers to all clickable breadcrumbs
   // All breadcrumbs are clickable except the last one (unless it's Nation)
   breadcrumbEl.querySelectorAll('.breadcrumb-crumb').forEach((crumb) => {
-    const depth = parseInt((crumb as HTMLElement).dataset.depth!, 10);
+    const depth = parseInt((crumb as HTMLElement).dataset.depth!, 10)
     crumb.addEventListener('click', () => {
       if (depth === -1) {
         // Clicking Nation: show sectors on map but Nation info in sidebar
-        selectedPath.length = 0;
-        setCurrentLevelIndex(0);
-        updateUrlState();
-        renderLevel();
-        displayNationInfo();
+        selectedPath.length = 0
+        setCurrentLevelIndex(0)
+        updateUrlState()
+        renderLevel()
+        displayNationInfo()
       } else {
-        selectedPath.length = depth + 1;
-        setCurrentLevelIndex(depth + 1);
-        updateUrlState();
-        renderLevel();
+        selectedPath.length = depth + 1
+        setCurrentLevelIndex(depth + 1)
+        updateUrlState()
+        renderLevel()
         // Show info for the org at this breadcrumb (by depth)
-        const org = selectedPath[depth];
-        if (org) loadOrgInfo(org);
+        const org = selectedPath[depth]
+        if (org) loadOrgInfo(org)
       }
-    });
-  });
+    })
+  })
 }
 
 function renderLevel(focusBounds?: L.LatLngBounds) {
   layerGroup.clearLayers()
   renderBreadcrumb()
-  
+
   // Update active layer button
   layersContainer.querySelectorAll('.layer-btn').forEach((btn) => {
     btn.classList.remove('layer-active')
@@ -903,66 +945,66 @@ function renderLevel(focusBounds?: L.LatLngBounds) {
   const allLatLngs: L.LatLng[] = []
 
   orgs.forEach((org) => {
-    let latLngs: L.LatLng[] | undefined;
+    let latLngs: L.LatLng[] | undefined
     // Special handling for International sector and General International Area - create star polygon in Atlantic
     if (isSectorInternational(org) || isGeneralInternationalArea(org)) {
-      const atlanticCenter = { lat: 20, lng: -40 };
-      const starPoints = createStarPolygon(atlanticCenter, 8, 5);
-      latLngs = starPoints.map((point) => L.latLng(point.lat, point.lng));
-      allLatLngs.push(...latLngs);
+      const atlanticCenter = { lat: 20, lng: -40 }
+      const starPoints = createStarPolygon(atlanticCenter, 8, 5)
+      latLngs = starPoints.map((point) => L.latLng(point.lat, point.lng))
+      allLatLngs.push(...latLngs)
     } else {
-      const points = getOrgPoints(org);
+      const points = getOrgPoints(org)
       // For regions/areas with fewer than 3 points, create a circle buffer
       if (points.length < 3) {
-        if (points.length === 0) return;
-        const center = { lat: points[0].lat, lng: points[0].lng };
+        if (points.length === 0) return
+        const center = { lat: points[0].lat, lng: points[0].lng }
         if (points.length === 2) {
-          center.lat = (points[0].lat + points[1].lat) / 2;
-          center.lng = (points[0].lng + points[1].lng) / 2;
+          center.lat = (points[0].lat + points[1].lat) / 2
+          center.lng = (points[0].lng + points[1].lng) / 2
         }
-        const circlePoints = createCircleBuffer(center, 0.15); // ~16km radius at equator
-        latLngs = circlePoints.map((point) => L.latLng(point.lat, point.lng));
-        allLatLngs.push(...latLngs);
+        const circlePoints = createCircleBuffer(center, 0.15) // ~16km radius at equator
+        latLngs = circlePoints.map((point) => L.latLng(point.lat, point.lng))
+        allLatLngs.push(...latLngs)
       } else {
-        const hull = convexHull(points);
-        if (hull.length < 3) return;
-        latLngs = hull.map((point) => L.latLng(point.lat, point.lng));
-        allLatLngs.push(...latLngs);
+        const hull = convexHull(points)
+        if (hull.length < 3) return
+        latLngs = hull.map((point) => L.latLng(point.lat, point.lng))
+        allLatLngs.push(...latLngs)
       }
     }
     // Guard: only create polygon if latLngs is valid and has at least 3 points
-    if (!latLngs || latLngs.length < 3) return;
+    if (!latLngs || latLngs.length < 3) return
     const polygon = L.polygon(latLngs, {
       color: getOrgColor(org.id),
       weight: 2,
       fillColor: getOrgColor(org.id),
-      fillOpacity: 0.18
-    });
+      fillOpacity: 0.18,
+    })
 
     polygon.on('mouseover', () => {
-      polygon.setStyle({ weight: 3, fillOpacity: 0.28 });
-      loadOrgInfo(org);
+      polygon.setStyle({ weight: 3, fillOpacity: 0.28 })
+      loadOrgInfo(org)
       // If at region level, update URL to reflect hovered region
       if (currentLevelIndex === 2) {
-        selectedPath.length = 0;
-        selectedPath.push(org);
-        updateUrlState();
+        selectedPath.length = 0
+        selectedPath.push(org)
+        updateUrlState()
       }
-    });
+    })
 
     polygon.on('mouseout', () => {
-      polygon.setStyle({ weight: 2, fillOpacity: 0.18 });
-    });
+      polygon.setStyle({ weight: 2, fillOpacity: 0.18 })
+    })
 
     polygon.on('click', () => {
       // Regions are view-only, don't navigate on click
-      if (org.orgType === 'region') return;
-      if (currentLevelIndex >= levelOrder.length - 1) return;
-      navigateToOrg(org);
-    });
+      if (org.orgType === 'region') return
+      if (currentLevelIndex >= levelOrder.length - 1) return
+      navigateToOrg(org)
+    })
 
-    polygon.addTo(layerGroup);
-  });
+    polygon.addTo(layerGroup)
+  })
 
   if (focusBounds) {
     map.fitBounds(focusBounds, { padding: [24, 24] })
@@ -974,7 +1016,6 @@ function renderLevel(focusBounds?: L.LatLngBounds) {
     renderPlaceholder(`No ${level}s available.`)
   }
 }
-
 
 async function init() {
   setMapLoading(true, 'Loading organizations...')
@@ -991,7 +1032,9 @@ async function init() {
     orgById.set(org.id, org)
   })
 
-  searchIndex = orgs.filter((org) => org.orgType === 'sector' || org.orgType === 'area' || org.orgType === 'region')
+  searchIndex = orgs.filter(
+    (org) => org.orgType === 'sector' || org.orgType === 'area' || org.orgType === 'region',
+  )
   searchInput.disabled = false
 
   items.forEach((item) => {
@@ -1025,37 +1068,37 @@ async function init() {
   buildChildrenMap(orgs)
   orgDescendantsCache.clear()
 
-  restoreStateFromUrl(orgById);
+  restoreStateFromUrl(orgById)
   // Check if we should zoom to a region and show its info
-  const params = new URLSearchParams(window.location.search);
-  const orgParam = params.get('org');
-  const levelParam = params.get('level');
-  let zoomed = false;
+  const params = new URLSearchParams(window.location.search)
+  const orgParam = params.get('org')
+  const levelParam = params.get('level')
+  let zoomed = false
   if (levelParam === '2' && orgParam) {
-    const orgId = parseInt(orgParam, 10);
-    const org = orgById.get(orgId);
+    const orgId = parseInt(orgParam, 10)
+    const org = orgById.get(orgId)
     if (org && org.orgType === 'region') {
-      const bounds = getFocusBounds(org);
-      renderLevel(bounds);
-      loadOrgInfo(org);
-      zoomed = true;
+      const bounds = getFocusBounds(org)
+      renderLevel(bounds)
+      loadOrgInfo(org)
+      zoomed = true
     }
   }
   if (!zoomed) {
-    renderLevel();
+    renderLevel()
     if (orgParam) {
-      const orgId = parseInt(orgParam, 10);
-      const org = orgById.get(orgId);
+      const orgId = parseInt(orgParam, 10)
+      const org = orgById.get(orgId)
       if (org) {
-        loadOrgInfo(org);
+        loadOrgInfo(org)
       } else {
-        displayNationInfo();
+        displayNationInfo()
       }
     } else {
-      displayNationInfo();
+      displayNationInfo()
     }
   }
-  setMapLoading(false);
+  setMapLoading(false)
 }
 
 init().catch((error) => {

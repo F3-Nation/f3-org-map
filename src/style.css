@@ -9,7 +9,7 @@
 .info-help-tooltip svg {
   border-radius: 50%;
   background: #fff;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
   width: 14px;
   height: 14px;
   min-width: 14px;
@@ -44,7 +44,7 @@
   pointer-events: auto;
 }
 :root {
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: "Inter", system-ui, sans-serif;
   line-height: 1.5;
   font-weight: 400;
   color: #111827;
@@ -55,15 +55,15 @@
   -moz-osx-font-smoothing: grayscale;
   --f3-black: #0b0d12;
   --f3-charcoal: #151a24;
-  --f3-gold: #B70D06;
-  --f3-gold-dark: #6D2A23;
+  --f3-gold: #b70d06;
+  --f3-gold-dark: #6d2a23;
   --f3-cream: #f6f3ea;
   --f3-ink: #111827;
   --f3-muted: #6b7280;
   --f3-border: #e5e7eb;
   --f3-card: #ffffff;
-  --f3-link: #B70D06;
-  --f3-link-hover: #6D2A23;
+  --f3-link: #b70d06;
+  --f3-link-hover: #6d2a23;
 }
 
 * {
@@ -231,7 +231,10 @@ body {
   letter-spacing: 0.04em;
   cursor: pointer;
   backdrop-filter: blur(8px);
-  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease;
 }
 
 .map-version:hover,
@@ -254,7 +257,9 @@ body {
   font-weight: 600;
   letter-spacing: 0.02em;
   z-index: 500;
-  transition: opacity 0.2s ease, visibility 0.2s ease;
+  transition:
+    opacity 0.2s ease,
+    visibility 0.2s ease;
   pointer-events: none;
 }
 
@@ -472,7 +477,10 @@ body {
   align-items: center;
   text-align: left;
   cursor: pointer;
-  transition: border 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    border 0.2s ease,
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .search-item:hover {
@@ -570,7 +578,9 @@ body {
   border-radius: 999px;
   background: #f1ead7;
   color: var(--f3-ink);
-  transition: background 0.2s ease, color 0.2s ease;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease;
   text-decoration: none;
 }
 
