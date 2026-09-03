@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 This project follows Keep a Changelog and uses Semantic Versioning.
 
+## [1.3.0](https://github.com/F3-Nation/f3-org-map/compare/v1.2.1...v1.3.0) (2026-09-03)
+
+
+### Features
+
+* api key ([#48](https://github.com/F3-Nation/f3-org-map/issues/48)) ([e36564d](https://github.com/F3-Nation/f3-org-map/commit/e36564d04a8971a959afc846e3de65992cbef441))
+
 ## [1.2.1](https://github.com/F3-Nation/f3-org-map/compare/v1.2.0...v1.2.1) (2026-05-24)
 
 
