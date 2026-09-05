@@ -8,6 +8,7 @@ import {
   buildOrgHierarchy,
   getOrgPointsFromItem,
   normalizeOrgType,
+  ORG_TYPE_PLURAL,
   type Org,
   type OrgChartItem,
   type OrgType,
@@ -19,6 +20,9 @@ import {
   updateUrlState,
   restoreStateFromUrl,
   levelOrder,
+  layerButtonTypes,
+  drillableTypes,
+  buildBreadcrumbPath,
   currentLevelIndex,
   selectedPath,
   setCurrentLevelIndex,
@@ -60,17 +64,27 @@ if (!app) {
   throw new Error('Missing #app container')
 }
 
+const brandSubtitle = levelOrder.map((type) => ORG_TYPE_PLURAL[type]).join(' → ')
+const layerButtonsHtml = layerButtonTypes
+  .map((type) => {
+    const levelIndex = levelOrder.indexOf(type)
+    const activeClass = levelIndex === 0 ? ' layer-active' : ''
+    return `<button class="layer-btn${activeClass}" data-level="${levelIndex}">${ORG_TYPE_PLURAL[type]}</button>`
+  })
+  .join('\n        ')
+const searchPlaceholder = `Search ${layerButtonTypes
+  .map((type) => ORG_TYPE_PLURAL[type].toLowerCase())
+  .join(', ')}`
+
 app.innerHTML = `
   <div class="app">
     <header class="top-bar">
       <div class="brand">
         <div class="brand-title">F3 Geographic Directory</div>
-        <div class="brand-subtitle">Sectors → Areas → Regions → AOs</div>
+        <div class="brand-subtitle">${brandSubtitle}</div>
       </div>
       <div class="layers" id="layers">
-        <button class="layer-btn layer-active" data-level="0">Sectors</button>
-        <button class="layer-btn" data-level="1">Areas</button>
-        <button class="layer-btn" data-level="2">Regions</button>
+        ${layerButtonsHtml}
       </div>
       <div class="controls">
         <div id="breadcrumb" class="breadcrumb"></div>
@@ -98,7 +112,7 @@ app.innerHTML = `
             id="org-search"
             class="search-input"
             type="search"
-            placeholder="Search sectors, areas, regions"
+            placeholder="${searchPlaceholder}"
             autocomplete="off"
             disabled
           />
@@ -403,27 +417,14 @@ function navigateToOrg(org: Org) {
   const levelIndex = levelOrder.indexOf(org.orgType)
   if (levelIndex === -1) return
 
-  if (org.orgType === 'sector') {
-    selectedPath.length = 0
-    selectedPath.push(org)
-    setCurrentLevelIndex(1) // Switch to area layer
-  } else if (org.orgType === 'area') {
-    const path = getOrgPath(org).filter((item) => item.orgType !== 'nation')
-    selectedPath.length = 0
-    selectedPath.push(...path)
-    setCurrentLevelIndex(2) // Switch to region layer
-  } else if (org.orgType === 'region') {
-    // Only show up to area in breadcrumb, not region itself
-    const path = getOrgPath(org).filter(
-      (item) => item.orgType !== 'nation' && item.orgType !== 'region',
-    )
-    selectedPath.length = 0
-    selectedPath.push(...path)
-    setCurrentLevelIndex(levelIndex)
+  selectedPath.length = 0
+  selectedPath.push(...buildBreadcrumbPath(org, getOrgPath(org)))
+
+  if (drillableTypes.includes(org.orgType)) {
+    // Drill into the next level: breadcrumb includes the selected org itself.
+    setCurrentLevelIndex(levelIndex + 1)
   } else {
-    const path = getOrgPath(org).filter((item) => item.orgType !== 'nation')
-    selectedPath.length = 0
-    selectedPath.push(...path.slice(0, -1))
+    // View-only leaf (e.g. region): stay at this level and show siblings.
     setCurrentLevelIndex(levelIndex)
   }
 
@@ -575,17 +576,20 @@ function renderInfo(org: Org, detail?: OrgInfo) {
     aoCount += metrics.aos
     locationsCount += metrics.locations
   })
-  const sectorCount = descendantOrgs.filter((item) => item.orgType === 'sector').length
-  const areaCount = descendantOrgs.filter((item) => item.orgType === 'area').length
-  const regionCount = descendantOrgs.filter((item) => item.orgType === 'region').length
-  const formattedAreaCount = formatNumber(areaCount)
-  const formattedRegionCount = formatNumber(regionCount)
-  const formattedSectorCount = formatNumber(sectorCount)
+  const currentType = detail?.orgType ?? org.orgType
+  const currentRank = levelOrder.indexOf(currentType)
+  const descendantCountsMarkup = layerButtonTypes
+    .filter((type) => levelOrder.indexOf(type) > currentRank)
+    .map((type) => {
+      const count = descendantOrgs.filter((item) => item.orgType === type).length
+      return `<div>${ORG_TYPE_PLURAL[type]}: ${formatNumber(count)}</div>`
+    })
+    .join('')
   const formattedAoCount = formatNumber(aoCount)
   const formattedEventsCount = formatNumber(eventsCount)
   const formattedLocationsCount = formatNumber(locationsCount)
   let regionFootprint: number | null = null
-  if ((detail?.orgType ?? org.orgType) === 'region') {
+  if (currentType === 'region') {
     const regionPoints = getOrgPoints(org)
     if (regionPoints.length >= 3) {
       const hull = convexHull(regionPoints)
@@ -670,8 +674,8 @@ function renderInfo(org: Org, detail?: OrgInfo) {
     : '<li class="info-empty">This organization has no admins. If you would like to take ownership of this organization, please fill out <a href="https://forms.gle/8AR4JCK3txSVr1Xy7" target="_blank" rel="noopener noreferrer">this form</a> and a Nation admin will get back to you.</li>'
 
   const displayName = escapeHtml(detail?.name ?? org.name)
-  const displayOrgType = escapeHtml((detail?.orgType ?? org.orgType).toUpperCase())
-  const orgAdminLogAttr = ` data-admin-log="${encodeAdminLog({ orgId: detail?.id ?? org.id, name: detail?.name ?? org.name, orgType: detail?.orgType ?? org.orgType })}"`
+  const displayOrgType = escapeHtml(currentType.toUpperCase())
+  const orgAdminLogAttr = ` data-admin-log="${encodeAdminLog({ orgId: detail?.id ?? org.id, name: detail?.name ?? org.name, orgType: currentType })}"`
 
   infoPanel.innerHTML = `
     <div class="info-title"${orgAdminLogAttr}>${displayName}</div>
@@ -684,9 +688,7 @@ function renderInfo(org: Org, detail?: OrgInfo) {
     <div class="info-section">
       <div class="info-label">Counts</div>
       <div class="info-value">
-        ${(detail?.orgType ?? org.orgType) === 'nation' ? `<div>Sectors: ${formattedSectorCount}</div>` : ''}
-        ${(detail?.orgType ?? org.orgType) === 'nation' || (detail?.orgType ?? org.orgType) === 'sector' ? `<div>Areas: ${formattedAreaCount}</div>` : ''}
-        ${(detail?.orgType ?? org.orgType) === 'nation' || (detail?.orgType ?? org.orgType) === 'sector' || (detail?.orgType ?? org.orgType) === 'area' ? `<div>Regions: ${formattedRegionCount}</div>` : ''}
+        ${descendantCountsMarkup}
         <div>Events: ${formattedEventsCount}</div>
         <div>AOs: ${formattedAoCount}</div>
         <div>Locations: ${formattedLocationsCount}</div>
@@ -803,7 +805,10 @@ async function loadOrgInfo(org: Org) {
     const existing = orgById.get(org.id)
     if (existing) {
       existing.name = data.name ?? existing.name
-      existing.orgType = normalizeOrgType(data.orgType, existing.orgType)
+      const refreshedType = normalizeOrgType(data.orgType)
+      if (refreshedType != null) {
+        existing.orgType = refreshedType
+      }
     }
   } catch (error) {
     if (activeInfoOrgId === org.id) {
@@ -870,11 +875,16 @@ function getCurrentLevelOrgs(): Org[] {
     return [...orgById.values()].filter((org) => org.orgType === level)
   }
 
-  // Special handling for International: get all region descendants (not just direct children)
-  if (isSectorInternational(parent) && level === 'region') {
+  // Special handling for International: get all territory/area/region
+  // descendants (not just direct children), since International's structure
+  // doesn't nest cleanly through area.
+  if (
+    isSectorInternational(parent) &&
+    (level === 'territory' || level === 'area' || level === 'region')
+  ) {
     const internationalDescendants = getDescendantOrgIds(parent.id)
     return [...orgById.values()].filter(
-      (org) => org.orgType === 'region' && internationalDescendants.includes(org.id),
+      (org) => org.orgType === level && internationalDescendants.includes(org.id),
     )
   }
 
@@ -985,7 +995,7 @@ function renderLevel(focusBounds?: L.LatLngBounds) {
       polygon.setStyle({ weight: 3, fillOpacity: 0.28 })
       loadOrgInfo(org)
       // If at region level, update URL to reflect hovered region
-      if (currentLevelIndex === 2) {
+      if (levelOrder[currentLevelIndex] === 'region') {
         selectedPath.length = 0
         selectedPath.push(org)
         updateUrlState()
@@ -997,8 +1007,8 @@ function renderLevel(focusBounds?: L.LatLngBounds) {
     })
 
     polygon.on('click', () => {
-      // Regions are view-only, don't navigate on click
-      if (org.orgType === 'region') return
+      // View-only leaves (e.g. region) don't navigate on click
+      if (!drillableTypes.includes(org.orgType)) return
       if (currentLevelIndex >= levelOrder.length - 1) return
       navigateToOrg(org)
     })
@@ -1013,7 +1023,7 @@ function renderLevel(focusBounds?: L.LatLngBounds) {
   }
 
   if (orgs.length === 0) {
-    renderPlaceholder(`No ${level}s available.`)
+    renderPlaceholder(`No ${ORG_TYPE_PLURAL[level].toLowerCase()} available.`)
   }
 }
 
@@ -1032,9 +1042,7 @@ async function init() {
     orgById.set(org.id, org)
   })
 
-  searchIndex = orgs.filter(
-    (org) => org.orgType === 'sector' || org.orgType === 'area' || org.orgType === 'region',
-  )
+  searchIndex = orgs.filter((org) => layerButtonTypes.includes(org.orgType))
   searchInput.disabled = false
 
   items.forEach((item) => {
@@ -1072,9 +1080,8 @@ async function init() {
   // Check if we should zoom to a region and show its info
   const params = new URLSearchParams(window.location.search)
   const orgParam = params.get('org')
-  const levelParam = params.get('level')
   let zoomed = false
-  if (levelParam === '2' && orgParam) {
+  if (orgParam && levelOrder[currentLevelIndex] === 'region') {
     const orgId = parseInt(orgParam, 10)
     const org = orgById.get(orgId)
     if (org && org.orgType === 'region') {

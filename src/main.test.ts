@@ -88,8 +88,18 @@ describe('convexHull', () => {
 describe('URL state helpers', () => {
   const nation: Org = { id: 1, name: 'Nation', orgType: 'nation', parentId: null }
   const sector: Org = { id: 10, name: 'Mid Atlantic', orgType: 'sector', parentId: 1 }
-  const area: Org = { id: 20, name: 'Carolinas', orgType: 'area', parentId: 10 }
+  const territory: Org = { id: 15, name: 'Southeast', orgType: 'territory', parentId: 10 }
+  const area: Org = { id: 20, name: 'Carolinas', orgType: 'area', parentId: 15 }
   const region: Org = { id: 30, name: 'Charlotte Metro', orgType: 'region', parentId: 20 }
+  const ao: Org = { id: 40, name: 'The Chariot', orgType: 'ao', parentId: 30 }
+  const orgById = new Map<number, Org>([
+    [1, nation],
+    [10, sector],
+    [15, territory],
+    [20, area],
+    [30, region],
+    [40, ao],
+  ])
 
   beforeEach(() => {
     selectedPath.length = 0
@@ -97,28 +107,43 @@ describe('URL state helpers', () => {
     window.history.replaceState(null, '', '/')
   })
 
-  it('writes level and org query params', () => {
-    selectedPath.push(sector, area)
-    setCurrentLevelIndex(2)
+  it('writes level and org query params using named levels', () => {
+    selectedPath.push(sector, territory, area)
+    setCurrentLevelIndex(3) // region, per the new sector/territory/area/region/ao order
 
     updateUrlState()
 
-    expect(window.location.search).toContain('level=2')
+    expect(window.location.search).toContain('level=region')
     expect(window.location.search).toContain('org=20')
   })
 
-  it('restores selected path from a region deep-link up to area', () => {
-    window.history.replaceState(null, '', '/?org=30&level=2')
-    const orgById = new Map<number, Org>([
-      [1, nation],
-      [10, sector],
-      [20, area],
-      [30, region],
-    ])
+  it('restores selected path from a region deep-link (named level) up to area', () => {
+    window.history.replaceState(null, '', '/?org=30&level=region')
 
     restoreStateFromUrl(orgById)
 
-    expect(currentLevelIndex).toBe(2)
-    expect(selectedPath.map((org) => org.id)).toEqual([10, 20])
+    expect(currentLevelIndex).toBe(3)
+    expect(selectedPath.map((org) => org.id)).toEqual([10, 15, 20])
+  })
+
+  it('interprets a legacy numeric level param against the pre-territory order', () => {
+    // Old links encoded level=2 to mean "region" under the 4-entry
+    // sector/area/region/ao order that predates territory.
+    window.history.replaceState(null, '', '/?org=30&level=2')
+
+    restoreStateFromUrl(orgById)
+
+    expect(currentLevelIndex).toBe(3)
+    expect(selectedPath.map((org) => org.id)).toEqual([10, 15, 20])
+  })
+
+  it('clamps the default level index for a deep-link to the last (leaf) level', () => {
+    // ao is the last entry in levelOrder; with no level param the "one level
+    // deeper than org type" default must clamp instead of going out of bounds.
+    window.history.replaceState(null, '', '/?org=40')
+
+    restoreStateFromUrl(orgById)
+
+    expect(currentLevelIndex).toBe(4)
   })
 })
