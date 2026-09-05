@@ -13,8 +13,8 @@ export const levelOrder: OrgType[] = [...ORG_TYPES].filter((type) => type !== 'n
 export const layerButtonTypes: OrgType[] = levelOrder.filter((type) => type !== 'ao')
 
 // Levels where selecting an org advances the drill-down to the next level.
-// The last layer-button level (region) is a view-only leaf: it stays at its
-// own level and shows siblings instead.
+// Whichever type is last in `layerButtonTypes` (currently region) is a
+// view-only leaf: it stays at its own level and shows siblings instead.
 export const drillableTypes: OrgType[] = layerButtonTypes.slice(0, -1)
 
 // Pre-territory URL '?level=N' encoding, kept only to interpret old bookmarked

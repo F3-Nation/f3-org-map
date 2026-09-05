@@ -66,6 +66,8 @@ describe('buildOrgHierarchy', () => {
 
     expect(byId.has(20)).toBe(false)
     expect(byId.get(10)).toMatchObject({ orgType: 'sector' })
+    // The child must not be left pointing at the skipped, never-created ancestor.
+    expect(byId.get(30)).toMatchObject({ parentId: null })
   })
 
   it('skips legacy bare-number hierarchy entries instead of positionally guessing their type', () => {

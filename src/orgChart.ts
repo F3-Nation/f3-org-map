@@ -1,3 +1,6 @@
+// Leaf-to-root order (ao → nation). src/state.ts reverses this to derive
+// root-to-leaf navigation order — insert a new level here in the position
+// matching its place in the real hierarchy.
 export const ORG_TYPES = ['ao', 'region', 'area', 'territory', 'sector', 'nation'] as const
 export type OrgType = (typeof ORG_TYPES)[number]
 
@@ -56,7 +59,11 @@ export function getOrgParentId(item: OrgChartItem): number | null {
   if (Array.isArray(hierarchy) && hierarchy.length > 0) {
     const first = hierarchy[0]
     if (Array.isArray(first)) {
-      return first[0] ?? null
+      // Only point at this ancestor if it will actually be created below —
+      // an unrecognized type means it gets skipped, so referencing its id
+      // here would leave a dangling parentId. Treat the item as a root
+      // instead of guessing which further ancestor should stand in for it.
+      return normalizeOrgType(first[2]) != null ? (first[0] ?? null) : null
     }
     return first ?? null
   }

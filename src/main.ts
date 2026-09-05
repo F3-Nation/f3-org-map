@@ -413,6 +413,17 @@ function getFocusBounds(org: Org): L.LatLngBounds | undefined {
   return L.latLngBounds(points.map((point) => L.latLng(point.lat, point.lng)))
 }
 
+// Finds the next level at or after `startIndex` that actually has orgs under
+// `parent`. Levels like territory can be unpopulated for a given branch
+// during the gradual backend rollout, so a fixed `levelIndex + 1` can point
+// at an empty level and strand navigation there.
+function nextLevelIndexWithOrgs(parent: Org, startIndex: number): number {
+  for (let i = startIndex; i < levelOrder.length; i++) {
+    if (getOrgsAtLevel(levelOrder[i], parent).length > 0) return i
+  }
+  return startIndex
+}
+
 function navigateToOrg(org: Org) {
   const levelIndex = levelOrder.indexOf(org.orgType)
   if (levelIndex === -1) return
@@ -421,8 +432,9 @@ function navigateToOrg(org: Org) {
   selectedPath.push(...buildBreadcrumbPath(org, getOrgPath(org)))
 
   if (drillableTypes.includes(org.orgType)) {
-    // Drill into the next level: breadcrumb includes the selected org itself.
-    setCurrentLevelIndex(levelIndex + 1)
+    // Drill into the next level with children: breadcrumb includes the
+    // selected org itself.
+    setCurrentLevelIndex(nextLevelIndexWithOrgs(org, levelIndex + 1))
   } else {
     // View-only leaf (e.g. region): stay at this level and show siblings.
     setCurrentLevelIndex(levelIndex)
@@ -576,7 +588,7 @@ function renderInfo(org: Org, detail?: OrgInfo) {
     aoCount += metrics.aos
     locationsCount += metrics.locations
   })
-  const currentType = detail?.orgType ?? org.orgType
+  const currentType = normalizeOrgType(detail?.orgType) ?? org.orgType
   const currentRank = levelOrder.indexOf(currentType)
   const descendantCountsMarkup = layerButtonTypes
     .filter((type) => levelOrder.indexOf(type) > currentRank)
@@ -808,6 +820,8 @@ async function loadOrgInfo(org: Org) {
       const refreshedType = normalizeOrgType(data.orgType)
       if (refreshedType != null) {
         existing.orgType = refreshedType
+      } else {
+        console.warn(`Ignoring unrecognized orgType for org ${org.id}:`, data.orgType)
       }
     }
   } catch (error) {
@@ -861,14 +875,10 @@ function createCircleBuffer(
   return circle
 }
 
-function getCurrentLevelOrgs(): Org[] {
-  const level = levelOrder[currentLevelIndex]
-
+function getOrgsAtLevel(level: OrgType, parent: Org | undefined): Org[] {
   if (level === 'sector') {
     return [...orgById.values()].filter((org) => org.orgType === 'sector')
   }
-
-  const parent = selectedPath[selectedPath.length - 1]
 
   // If no parent selected, show all orgs of this level (for layer button views)
   if (!parent) {
@@ -897,6 +907,10 @@ function getCurrentLevelOrgs(): Org[] {
   }
 
   return [...orgById.values()].filter((org) => org.orgType === level && org.parentId === parent.id)
+}
+
+function getCurrentLevelOrgs(): Org[] {
+  return getOrgsAtLevel(levelOrder[currentLevelIndex], selectedPath[selectedPath.length - 1])
 }
 
 function renderBreadcrumb() {
@@ -928,12 +942,16 @@ function renderBreadcrumb() {
         displayNationInfo()
       } else {
         selectedPath.length = depth + 1
-        setCurrentLevelIndex(depth + 1)
+        const org = selectedPath[depth]
+        if (!org) return
+        // Derive the level from the clicked org's actual type rather than its
+        // position in the breadcrumb: once a hierarchy level (e.g. territory)
+        // can be missing for a given org, `selectedPath` and `levelOrder`
+        // are no longer guaranteed to stay positionally aligned.
+        setCurrentLevelIndex(levelOrder.indexOf(org.orgType) + 1)
         updateUrlState()
         renderLevel()
-        // Show info for the org at this breadcrumb (by depth)
-        const org = selectedPath[depth]
-        if (org) loadOrgInfo(org)
+        loadOrgInfo(org)
       }
     })
   })
